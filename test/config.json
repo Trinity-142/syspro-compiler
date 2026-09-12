@@ -1,12 +1,17 @@
 {
-  "$schema": "schemas/config.schema.json",
-  "build": "",
+  "build": "sbt compile",
   "default_grammar": "1",
   "versions": [1, 2, 3, 4, 5],
   "out_dir": "{root}/test/build",
   "stages": {
     "lexer": {
-      "cmd": ["{root}/build/splc", "-g", "{grammar}", "-t", "{tokens_in}", "{input}"],
+      "cmd": ["scala",
+        "-cp", "target/scala-3.8.4/classes",
+        "-M", "main",
+        "--",
+        "-g", "{grammar}",
+        "-t", "{tokens_out}",
+        "{input}"],
       "out": "{tokens_out}",
       "preprocess": [
         {"type": "json", "keep": ["kind", "line", "column"]}
