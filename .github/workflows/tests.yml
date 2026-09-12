@@ -18,6 +18,20 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup sbt
+        uses: sbt/setup-sbt@v1
+
+      - name: Setup Scala
+        uses: coursier/setup-action@v1
+        with:
+          apps: scala
+
       - name: Validate JSON schemas
         run: |
           #pip install jsonschema
