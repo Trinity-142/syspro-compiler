@@ -6,7 +6,7 @@
   "stages": {
     "lexer": {
       "cmd": ["scala",
-        "-cp", "target/scala-3.8.4/classes",
+        "-cp", "target/classes",
         "-M", "main",
         "--",
         "-g", "{grammar}",
