@@ -1,6 +1,10 @@
 # Build artifacts
 build/
 test/build/
+target/
+project/
+.scala-build/
+.bsp/
 
 # IDE / editor
 .cache
