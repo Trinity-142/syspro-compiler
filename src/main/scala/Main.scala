@@ -1,4 +1,4 @@
-import Kind.{DIV, EOF, EQ, ERROR, IDENT, INT, LPAREN, MINUS, MULT, PLUS, RETURN, RPAREN, SEMI, VAL, VAR}
+import Kind._
 import java.io.{File, PrintWriter}
 import scala.annotation.tailrec
 import scala.io.Source
@@ -6,7 +6,7 @@ import scala.util.Using
 import scala.collection.immutable.List
 
 enum Kind {
-  case INT, EOF, EQ, SEMI, IDENT, VAL, VAR, RETURN, PLUS, MINUS, MULT, DIV, ERROR, LPAREN, RPAREN
+  case INT, EOF, ASSIGN, SEMI, IDENT, VAL, VAR, RETURN, PLUS, MINUS, MULT, DIV, ERROR, LPAREN, RPAREN
 }
 
 case class Token(kind: Kind, value: String, line: Int, column: Int) {
@@ -62,7 +62,7 @@ def lexer(chars: LazyList[Char], line: Int, column: Int, tokens: List[Token]): L
 
     case char #:: tail =>
       val (nextChars, nextLine, nextColumn, nextTokens) = char match {
-        case '=' => (tail, line, column + 1, Token(EQ, "=", line, column) :: tokens)
+        case '=' => (tail, line, column + 1, Token(ASSIGN, "=", line, column) :: tokens)
         case ';' => (tail, line, column + 1, Token(SEMI, ";", line, column) :: tokens)
         case '+' => (tail, line, column + 1, Token(PLUS, "+", line, column) :: tokens)
         case '-' => (tail, line, column + 1, Token(MINUS, "-", line, column) :: tokens)
