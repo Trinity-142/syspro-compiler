@@ -22,19 +22,27 @@ case class Token(kind: Kind, value: String, line: Int, column: Int) {
   while (i < args.length) {
     args(i) match {
       case "-t" =>
-        outputPath = args(i + 1)
-        i += 2
-      case "-g" =>
-        i += 2
+        if (i + 1 < args.length) {
+          outputPath = args(i + 1)
+          i += 2
+        } else {
+          System.err.println("Error: missing file path after '-t'")
+          sys.exit(1)
+        }
       case arg if !arg.startsWith("-") =>
+        if (inputPath.nonEmpty) {
+          System.out.println(s"Error: multiple input files. Found '$inputPath' and '$arg'")
+          sys.exit(1)
+        }
         inputPath = arg
         i += 1
-      case _ =>
-        i += 1
+      case unknown =>
+        System.err.println(s"Error: unknown option '$unknown'")
+        sys.exit(1)
     }
   }
   if (inputPath.isEmpty || outputPath.isEmpty) {
-    println("Usage: main -g <grammar> -t <out> <input>")
+    println("Usage: splc -t <out> <input>")
     sys.exit(1)
   }
 

@@ -5,13 +5,7 @@
   "out_dir": "{root}/test/build",
   "stages": {
     "lexer": {
-      "cmd": ["scala",
-        "-cp", "target/classes",
-        "-M", "main",
-        "--",
-        "-g", "{grammar}",
-        "-t", "{tokens_out}",
-        "{input}"],
+      "cmd": ["{root}/splc", "-t", "{tokens_in}", "{input}"],
       "out": "{tokens_out}",
       "preprocess": [
         {"type": "json", "keep": ["kind", "line", "column"]}
