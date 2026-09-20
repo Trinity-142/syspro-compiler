@@ -55,3 +55,20 @@ enum Token(val line: Int, val column: Int) {
   override def toString: String =
     s"""{"kind": "$kind", "value": "$lexeme", "line": $line, "column": $column}"""
 }
+
+
+enum Stmt {
+  case Return(keyWord: Token, expr: Expr)
+  case Decl(keyWord: Token, ident: Token, value: Expr)
+  case Assign(ident: Token, value: Expr)
+  case ExprStmt(expr: Expr)
+  case ErrorStmt()
+}
+
+enum Expr {
+  case Binary(left: Expr, op: Token, right: Expr)
+  case Unary(op: Token, expr: Expr)
+  case IntLiteral(value: Long, token: Token)
+  case Ident(ident: Token)
+  case ErrorExpr()
+}
