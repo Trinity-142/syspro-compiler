@@ -1,12 +1,8 @@
-//import Kind._
-import Token.ErrorTok
-
 import java.io.{File, PrintWriter}
 import scala.annotation.tailrec
 import scala.io.Source
 import scala.util.Using
 import scala.collection.immutable.List
-
 
 
 @main def main(args: String*): Unit = {
@@ -47,7 +43,37 @@ import scala.collection.immutable.List
       }
       if (lexedTokens.exists(_.isInstanceOf[Token.ErrorTok])) sys.exit(1)
     }
+
+
+    if (astOut.nonEmpty) {
+      val parsedAst = parseProgram(lexedTokens, Nil)
+      if (astOut.nonEmpty) {
+        val astJsonString = AstSerializer.toJson(parsedAst)
+        Using(PrintWriter(File(astOut))) { writer =>
+          writer.write(astJsonString)
+        }
+      }
+      if (hasParserErrors) sys.exit(1)
+      if (!hasReturn(parsedAst)) {
+        System.err.println("Semantic error: last statement must be a 'return' statement")
+        sys.exit(1)
+      }
+
+      val initialState = AnalyzerState(Map.empty, List.empty)
+      val finalState = parsedAst.foldLeft(initialState)((state, stmt) => analyze(state, stmt))
+
+      val errors = finalState.semanticErrors.reverse
+      if (errors.nonEmpty) {
+        errors.foreach(System.err.println)
+        sys.exit(1)
+      }
+    }
   }
+}
+
+def hasReturn(stmts: List[Stmt]): Boolean = stmts.lastOption match {
+  case Some(Stmt.Return(_, _)) => true
+  case _ => false
 }
 
 @tailrec
@@ -91,7 +117,7 @@ def lexer(chars: LazyList[Char], line: Int, column: Int, tokens: List[Token]): L
           (rest, line, column + value.length, newToken :: tokens)
 
         case unexpected =>
-          System.err.println(s"Lexer error at $line:$column: unexpected character '$unexpected'")
+          // System.err.println(s"Lexer error at $line:$column: unexpected character '$unexpected'")
           val errorToken = Token.ErrorTok(s"unexpected character: '$unexpected'", line, column)
           (tail, line, column + 1, errorToken :: tokens)
       }
@@ -101,13 +127,12 @@ def lexer(chars: LazyList[Char], line: Int, column: Int, tokens: List[Token]): L
 }
 
 @tailrec
-def skipBlockComment(
-  chars: LazyList[Char],
-  line: Int,
-  column: Int,
-  startLine: Int,
-  startColumn: Int,
-  tokens: List[Token]): (LazyList[Char], Int, Int, List[Token]) = {
+def skipBlockComment(chars: LazyList[Char], 
+                     line: Int, 
+                     column: Int, 
+                     startLine: Int, 
+                     startColumn: Int,
+                     tokens: List[Token]): (LazyList[Char], Int, Int, List[Token]) = {
   chars match
     case '*' #:: '/' #:: tail =>
       (tail, line, column + 2, tokens)
@@ -119,7 +144,7 @@ def skipBlockComment(
       skipBlockComment(tail, line, column + 1, startLine, startColumn, tokens)
 
     case LazyList() =>
-      System.err.println(s"Lexer error at $startLine:$startColumn: unterminated block comment")
+      // System.err.println(s"Lexer error at $startLine:$startColumn: unterminated block comment")
       val errorToken = Token.ErrorTok("unterminated block comment", startLine, startColumn)
       (chars, line, column, errorToken :: tokens)
 }
