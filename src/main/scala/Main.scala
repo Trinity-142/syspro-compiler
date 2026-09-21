@@ -36,6 +36,7 @@ import scala.collection.immutable.List
   Using(Source.fromFile(inputPath)) { source =>
     val chars = source.to(LazyList)
 
+    // ------------ LEXER ------------
     val lexedTokens = lexer(chars, 1, 1, Nil)
     if (tokensOut.nonEmpty) {
       Using(PrintWriter(File(tokensOut))) { writer =>
@@ -45,35 +46,37 @@ import scala.collection.immutable.List
     }
 
 
+    // ------------ PARSER ------------
     if (astOut.nonEmpty) {
-      val parsedAst = parseProgram(lexedTokens, Nil)
+      val (parsedAst, finalParserState) = parseProgram(ParserState(lexedTokens, errors = List.empty), Nil)
+
       if (astOut.nonEmpty) {
         val astJsonString = AstSerializer.toJson(parsedAst)
         Using(PrintWriter(File(astOut))) { writer =>
           writer.write(astJsonString)
         }
       }
-      if (hasParserErrors) sys.exit(1)
-      if (!hasReturn(parsedAst)) {
+
+      if (finalParserState.errors.nonEmpty) {
+        finalParserState.errors.reverse.foreach(System.err.println)
+        sys.exit(1)
+      }
+
+      if (!parsedAst.lastOption.exists(_.isInstanceOf[Stmt.Return])) {
         System.err.println("Semantic error: last statement must be a 'return' statement")
         sys.exit(1)
       }
 
-      val initialState = AnalyzerState(Map.empty, List.empty)
-      val finalState = parsedAst.foldLeft(initialState)((state, stmt) => analyze(state, stmt))
+      // ------------ AST ANALYZER ------------
+      val initialState = AnalyzerState(symbolTable = Map.empty, errors = List.empty)
+      val finalAnalyzerState = parsedAst.foldLeft(initialState)((state, stmt) => analyze(state, stmt))
 
-      val errors = finalState.semanticErrors.reverse
-      if (errors.nonEmpty) {
-        errors.foreach(System.err.println)
+      if (finalAnalyzerState.errors.nonEmpty) {
+        finalAnalyzerState.errors.reverse.foreach(System.err.println)
         sys.exit(1)
       }
     }
   }
-}
-
-def hasReturn(stmts: List[Stmt]): Boolean = stmts.lastOption match {
-  case Some(Stmt.Return(_, _)) => true
-  case _ => false
 }
 
 @tailrec
