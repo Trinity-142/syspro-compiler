@@ -1,5 +1,5 @@
-case class AnalyzerState(symbolTable: Map[String, Boolean], semanticErrors: List[String]) {
-  def withError(msg: String): AnalyzerState = this.copy(semanticErrors = msg :: this.semanticErrors)
+case class AnalyzerState(symbolTable: Map[String, Boolean], errors: List[String]) {
+  def withError(msg: String): AnalyzerState = this.copy(errors = msg :: this.errors)
 }
 
 def analyze(state: AnalyzerState, stmt: Stmt | Expr): AnalyzerState = stmt match {
