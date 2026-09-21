@@ -1,59 +1,51 @@
 object AstSerializer {
-  
-  private def getExprCoords(expr: Expr): (Int, Int) = expr match {
-    case Expr.Binary(_, op, _)     => (op.line, op.column)
-    case Expr.Unary(op, _)         => (op.line, op.column)
-    case Expr.IntLiteral(_, token) => (token.line, token.column)
-    case Expr.Ident(token)         => (token.line, token.column)
-    case Expr.ErrorExpr()          => (0, 0)
-  }
-
-  private def getStmtCoords(stmt: Stmt): (Int, Int) = stmt match {
-    case Stmt.Decl(kw, _, _)    => (kw.line, kw.column)
-    case Stmt.Return(kw, _)     => (kw.line, kw.column)
-    case Stmt.Assign(ident, _)  => (ident.line, ident.column)
-    case Stmt.ExprStmt(expr)    => getExprCoords(expr)
-    case Stmt.ErrorStmt()       => (0, 0)
-  }
-
   private def exprToJson(expr: Expr): String = expr match {
     case Expr.Binary(left, op, right) =>
-      s"""{"line": ${op.line}, "column": ${op.column}, "kind": "BinOp", "left": ${exprToJson(left)}, "right": ${exprToJson(right)}}"""
+      s"""{"line": ${op.line}, "column": ${op.column}, "kind": "BinOp", "elems": [${exprToJson(left)},${exprToJson(right)}]}"""
+
     case Expr.Unary(op, e) =>
-      s"""{"line": ${op.line}, "column": ${op.column}, "kind": "Unary", "operand": ${exprToJson(e)}}"""
+      s"""{"line": ${op.line}, "column": ${op.column}, "kind": "Unary", "elems": [${exprToJson(e)}]}"""
+
     case Expr.IntLiteral(_, token) =>
-      s"""{"line": ${token.line}, "column": ${token.column}, "kind": "IntLiteral"}"""
+      s"""{"line": ${token.line}, "column": ${token.column}, "kind": "IntLiteral", "elems": []}"""
+
     case Expr.Ident(token) =>
-      s"""{"line": ${token.line}, "column": ${token.column}, "kind": "Ident"}"""
-    case Expr.ErrorExpr() =>
-      s"""{"kind": "Error"}"""
+      s"""{"line": ${token.line}, "column": ${token.column}, "kind": "Ident", "elems": []}"""
+
+    case Expr.ErrorExpr(token) =>
+      s"""{"line": ${token.line}, "column": ${token.column}, "kind": "Error", "elems": []}"""
   }
 
   private def stmtToJson(stmt: Stmt): String = stmt match {
-    case Stmt.Decl(kw, _, value) =>
-      s"""{"line": ${kw.line}, "column": ${kw.column}, "kind": "Declare", "init": ${exprToJson(value)}}"""
+    case Stmt.Decl(kw, ident, value) =>
+      val identJson = s"""{"line": ${ident.line}, "column": ${ident.column}, "kind": "Ident", "elems": []}"""
+      s"""{"line": ${kw.line}, "column": ${kw.column}, "kind": "Declare", "elems": [$identJson,${exprToJson(value)}]}"""
+
     case Stmt.Return(kw, value) =>
-      s"""{"line": ${kw.line}, "column": ${kw.column}, "kind": "Return", "value": ${exprToJson(value)}}"""
+      s"""{"line": ${kw.line}, "column": ${kw.column}, "kind": "Return", "elems": [${exprToJson(value)}]}"""
+
     case Stmt.Assign(ident, value) =>
-      s"""{"line": ${ident.line}, "column": ${ident.column}, "kind": "Assign", "target": {"line": ${ident.line}, "column": ${ident.column}, "kind": "Ident"}, "value": ${exprToJson(value)}}"""
+      val identJson = s"""{"line": ${ident.line}, "column": ${ident.column}, "kind": "Ident", "elems": []}"""
+      s"""{"line": ${ident.line}, "column": ${ident.column}, "kind": "Assign", "elems": [$identJson,${exprToJson(value)}]}"""
+
     case Stmt.ExprStmt(expr) =>
-      val (line, col) = getExprCoords(expr)
-      s"""{"line": $line, "column": $col, "kind": "ExprStmt", "value": ${exprToJson(expr)}}"""
-    case Stmt.ErrorStmt() =>
-      s"""{"kind": "ErrorStmt"}"""
+      exprToJson(expr)
+
+    case Stmt.ErrorStmt(token) =>
+      s"""{"line": ${token.line}, "column": ${token.column}, "kind": "Error", "elems": []}"""
   }
 
   def toJson(stmts: List[Stmt]): String = {
-    val (line, col) = stmts.headOption.map(getStmtCoords).getOrElse((1, 1))
-    val bodyJson = stmts.map(stmtToJson).mkString(",\n    ")
+    val (line, col) = ((stmt: Stmt) => (stmt.line, stmt.column))(stmts.head)
+    val elemsJson = stmts.map(stmtToJson).mkString(",\n    ")
 
     s"""{
-  "line": $line,
-  "column": $col,
-  "kind": "Program",
-  "body": [
-    $bodyJson
-  ]
-}"""
+        "line": $line,
+        "column": $col,
+        "kind": "Program",
+        "elems": [
+        $elemsJson
+        ]
+        }"""
   }
 }
