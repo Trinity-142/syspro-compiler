@@ -30,7 +30,7 @@ def analyze(state: AnalyzerState, stmt: Stmt | Expr): AnalyzerState = stmt match
 
   case Stmt.Return(_, expr) => analyze(state, expr)
   case Stmt.ExprStmt(expr)  => analyze(state, expr)
-  case Stmt.ErrorStmt()     => state
+  case Stmt.ErrorStmt(_)    => state
 
   // ------------ EXPRESSIONS ------------
 
@@ -45,6 +45,6 @@ def analyze(state: AnalyzerState, stmt: Stmt | Expr): AnalyzerState = stmt match
   case Expr.Unary(_, expr) =>
     analyze(state, expr)
 
-  case Expr.IntLiteral(_, _) | Expr.ErrorExpr() =>
+  case _: (Expr.IntLiteral | Expr.ErrorExpr) =>
     state
 }

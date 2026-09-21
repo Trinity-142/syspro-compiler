@@ -18,7 +18,7 @@ def parseProgram(tokens: List[Token], program: List[Stmt]): List[Stmt] = tokens 
     case _ =>
       val (stmt, rest) = parseStmt(tokens)
       stmt match {
-        case err @ Stmt.ErrorStmt() =>
+        case err: Stmt.ErrorStmt =>
           parseProgram(rest, err :: program)
         case validStmt =>
           val (stmtsToAdd, nextTokens) = expectSemi(validStmt, rest)
@@ -38,7 +38,7 @@ def parseStmt(tokens: List[Token]): (Stmt, List[Token]) = tokens match {
     case (kw: (Token.Val | Token.Var)) :: (ident: Token.Ident) :: tail =>
       System.err.println(s"Parser error at ${ident.line}:${ident.column}: '=' expected after declaration")
       hasParserErrors = true
-      (Stmt.Decl(kw, ident, Expr.ErrorExpr()), synchronize(tail))
+      (Stmt.Decl(kw, ident, Expr.ErrorExpr(ident)), synchronize(tail))
 
     case (ident: Token.Ident) :: (_: Token.Assign) :: tail =>
       val (expr, rest) = parseExpr(0, tail)
@@ -51,17 +51,17 @@ def parseStmt(tokens: List[Token]): (Stmt, List[Token]) = tokens match {
     case (err: Token.ErrorTok) :: tail =>
       System.err.println(s"Error at $err.line:$err.column: $err.msg")
       hasParserErrors = true
-      (Stmt.ErrorStmt(), synchronize(tail))
+      (Stmt.ErrorStmt(err), synchronize(tail))
 
     case unexpected :: tail =>
       System.err.println(s"Parser error at ${unexpected.line}:${unexpected.column}: unexpected token '${unexpected.lexeme}'")
       hasParserErrors = true
-      (Stmt.ErrorStmt(), synchronize(tail))
+      (Stmt.ErrorStmt(unexpected), synchronize(tail))
 
     case Nil =>
       System.err.println("Compiler error: statement expected, but token stream exhausted")
       hasParserErrors = true
-      (Stmt.ErrorStmt(), Nil)
+      (Stmt.ErrorStmt(Token.Eof(0, 0)), Nil)
 }
 
 def expectSemi(validStmt: Stmt, tokens: List[Token]): (List[Stmt], List[Token]) = tokens match {
@@ -127,12 +127,12 @@ def parseUnary(tokens: List[Token]): (Expr, List[Token]) = tokens match {
   case unexpected :: _ =>
     System.err.println(s"Error at ${unexpected.line}:${unexpected.column}: expression expected, found '${unexpected.lexeme}'")
     hasParserErrors = true
-    (Expr.ErrorExpr(), tokens)
+    (Expr.ErrorExpr(unexpected), tokens)
 
   case Nil =>
     System.err.println("Compiler error: token stream unexpectedly exhausted")
     hasParserErrors = true
-    (Expr.ErrorExpr(), Nil)
+    (Expr.ErrorExpr(Token.Eof(0, 0)), Nil)
 }
 
 def expectRparen(expr: Expr, tokens: List[Token]): (Expr, List[Token]) = tokens match {
