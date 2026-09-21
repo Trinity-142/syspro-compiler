@@ -37,7 +37,7 @@ object AstSerializer {
 
   def toJson(stmts: List[Stmt]): String = {
     val (line, col) = ((stmt: Stmt) => (stmt.line, stmt.column))(stmts.head)
-    val elemsJson = stmts.map(stmtToJson).mkString(",\n    ")
+    val elemsJson = stmts.map(stmtToJson).mkString(",\n")
 
     s"""{
         "line": $line,
