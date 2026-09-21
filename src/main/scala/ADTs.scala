@@ -1,4 +1,31 @@
-enum Token(val line: Int, val column: Int) {
+trait Coords {
+  def line: Int
+  def column: Int
+}
+
+enum Stmt(val startToken: Token) extends Coords {
+  def line: Int = startToken.line
+  def column: Int = startToken.column
+
+  case Return(keyWord: Token, expr: Expr)               extends Stmt(keyWord)
+  case Decl(keyWord: Token, ident: Token, value: Expr)  extends Stmt(keyWord)
+  case Assign(ident: Token, value: Expr)                extends Stmt(ident)
+  case ExprStmt(expr: Expr)                             extends Stmt(expr.startToken)
+  case ErrorStmt(token: Token)                          extends Stmt(token)
+}
+
+enum Expr(val startToken: Token) extends Coords {
+  def line: Int = startToken.line
+  def column: Int = startToken.column
+
+  case Binary(left: Expr, op: Token, right: Expr) extends Expr(op)
+  case Unary(op: Token, expr: Expr)               extends Expr(op)
+  case IntLiteral(value: Long, token: Token)      extends Expr(token)
+  case Ident(ident: Token)                        extends Expr(ident)
+  case ErrorExpr(token: Token)                    extends Expr(token)
+}
+
+enum Token(val line: Int, val column: Int) extends Coords {
   case Rparen(l: Int, c: Int) extends Token(l, c)
   case Lparen(l: Int, c: Int) extends Token(l, c)
   case Assign(l: Int, c: Int) extends Token(l, c)
@@ -10,11 +37,11 @@ enum Token(val line: Int, val column: Int) {
   case Val(l: Int, c: Int) extends Token(l, c)
   case Var(l: Int, c: Int) extends Token(l, c)
   case Return(l: Int, c: Int) extends Token(l, c)
+  case Eof(l: Int, c: Int) extends Token(l, c)
 
   case Ident(value: String, l: Int, c: Int) extends Token(l, c)
   case IntTok(value: String, l: Int, c: Int) extends Token(l, c)
   case ErrorTok(msg: String, l: Int, c: Int) extends Token(l, c)
-  case Eof(l: Int, c: Int) extends Token(l, c)
 
   def lexeme: String = this match {
     case _: Rparen => ")"
