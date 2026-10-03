@@ -26,17 +26,6 @@ object IRGenerator {
       identToMem += (name -> ptrReg)
     }
 
-    def tryFoldConstants(lhs: String, op: Token, rhs: String): Option[String] = (lhs.toLongOption, rhs.toLongOption) match {
-      case (Some(x), Some(y)) => op match {
-        case _: Token.Plus  => Some((x + y).toString)
-        case _: Token.Minus => Some((x - y).toString)
-        case _: Token.Mult  => Some((x * y).toString)
-        case _: Token.Div   => Try(x / y).map(_.toString).toOption
-        case _              => None
-      }
-      case _ => None
-    }
-
     // ------------ EXPRESSIONS ------------
     def genExpr(expr: Expr): String = expr match {
       case Expr.Binary(left, op, right) =>
@@ -109,5 +98,16 @@ object IRGenerator {
 
     stmts.foreach(genStmt)
     instructions.toList
+  }
+
+  private def tryFoldConstants(lhs: String, op: Token, rhs: String): Option[String] = (lhs.toLongOption, rhs.toLongOption) match {
+    case (Some(x), Some(y)) => op match {
+      case _: Token.Plus => Some((x + y).toString)
+      case _: Token.Minus => Some((x - y).toString)
+      case _: Token.Mult => Some((x * y).toString)
+      case _: Token.Div => Try(x / y).map(_.toString).toOption
+      case _ => None
+    }
+    case _ => None
   }
 }
