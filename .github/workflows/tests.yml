@@ -44,4 +44,6 @@ jobs:
         run: sbt compile
 
       - name: Run tests for grammar ${{ matrix.grammar }}
-        run: python3 test/run_tests.py test --grammar ${{ matrix.grammar }} --stage lexer --no-build
+        run: |
+          python3 test/run_tests.py test --grammar ${{ matrix.grammar }} --stage lexer --no-build &&
+          python3 test/run_tests.py test --grammar ${{ matrix.grammar }} --stage parser --no-build
