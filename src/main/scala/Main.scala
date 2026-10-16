@@ -3,6 +3,7 @@ import scala.annotation.tailrec
 import scala.io.Source
 import scala.util.Using
 import scala.collection.immutable.List
+import scala.sys.process._
 
 
 @main def main(args: String*): Unit = {
@@ -99,6 +100,17 @@ import scala.collection.immutable.List
       Using(PrintWriter(File(llvmOut))) { writer =>
         writer.write(llvmIR)
       }
+    }
+
+    // ------------ COMPILE AND RUN ------------
+    val binPath = llvmOut.stripSuffix(".ll")
+    val compileCommand = s"clang -Wno-override-module $llvmOut -o $binPath"
+    val compileExitCode = compileCommand.!
+    if (compileExitCode == 0) {
+      val output = s"./$binPath".!
+      println(output)
+    } else {
+      System.err.println("LLVM IR compilation error")
     }
   }
 }
