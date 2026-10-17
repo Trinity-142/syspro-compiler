@@ -1,12 +1,15 @@
 import java.io.{File, PrintWriter}
-import scala.annotation.tailrec
 import scala.io.Source
 import scala.util.Using
 import scala.collection.immutable.List
-import scala.sys.process._
+import scala.sys.process.*
 
 
 @main def main(args: String*): Unit = {
+  if (args.isEmpty) {
+    REPL.start()
+    return
+  }
   var inputPath = ""
   var tokensOut = ""
   var astOut = ""
@@ -15,6 +18,10 @@ import scala.sys.process._
   var i = 0
   while (i < args.length) {
     args(i) match {
+      case "--help" =>
+        println("Usage: splc -t <tokens_out> -a <ast_out> -o <llvm_out> <input>")
+        println("REPL: splc")
+        i += 1
       case "-t" =>
         tokensOut = args(i + 1)
         i += 2
@@ -33,7 +40,7 @@ import scala.sys.process._
     }
   }
 
-  if (inputPath.isEmpty) {
+  if (inputPath.isEmpty && !args.contains("--help")) {
     println("Usage: splc -t <tokens_out> -a <ast_out> -o <llvm_out> <input>")
     sys.exit(1)
   }
@@ -56,7 +63,7 @@ import scala.sys.process._
 
 
     // ------------ PARSER ------------
-    val (parsedAst, finalParserState) = parseProgram(ParserState(lexedTokens, errors = List.empty), Nil)
+    val (parsedAst, parserErrors) = parseProgram(ParserState(lexedTokens, errors = List.empty), Nil)
     if (astOut.nonEmpty) {
       val astJsonString = AstSerializer.toJson(parsedAst)
       Using(PrintWriter(File(astOut))) { writer =>
@@ -64,8 +71,8 @@ import scala.sys.process._
       }
     }
 
-    if (finalParserState.errors.nonEmpty) {
-      finalParserState.errors.reverse.foreach(System.err.println)
+    if (parserErrors.nonEmpty) {
+      parserErrors.foreach(System.err.println)
       sys.exit(1)
     }
 
@@ -75,7 +82,7 @@ import scala.sys.process._
     }
 
     // ------------ AST ANALYZER ------------
-    val initialState = AstAnalyzer.AnalyzerState(symbolTable = Map.empty, errors = List.empty)
+    val initialState = AstAnalyzer.AnalyzerState()
     val finalAnalyzerState = parsedAst.foldLeft(initialState)((state, stmt) => AstAnalyzer.analyze(state, stmt))
 
     if (finalAnalyzerState.errors.nonEmpty) {
