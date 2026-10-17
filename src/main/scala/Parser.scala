@@ -19,12 +19,12 @@ case class ParserState(tokens: List[Token], errors: List[String]) {
 // ------------ STATEMENTS ------------
 
 @tailrec
-def parseProgram(state: ParserState, program: List[Stmt]): (List[Stmt], ParserState) = state.tokens match {
+def parseProgram(state: ParserState, program: List[Stmt]): (List[Stmt], List[String]) = state.tokens match {
     case (_: Token.Eof) :: _ =>
-      (program.reverse, state)
+      (program.reverse, state.errors.reverse)
 
     case Nil =>
-      (program.reverse, state)
+      (program.reverse, state.errors.reverse)
 
     case _ =>
       val (stmt, stateAfterStmt) = parseStmt(state)

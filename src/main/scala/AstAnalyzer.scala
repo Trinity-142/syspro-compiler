@@ -1,5 +1,5 @@
 object AstAnalyzer {
-  case class AnalyzerState(symbolTable: Map[String, Boolean], errors: List[String]) {
+  case class AnalyzerState(symbolTable: Map[String, Boolean] = Map.empty, errors: List[String] = Nil) {
     def withError(msg: String): AnalyzerState = this.copy(errors = msg :: this.errors)
   }
   
