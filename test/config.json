@@ -20,7 +20,7 @@
       ]
     },
     "llvm": {
-      "cmd": ["{root}/build/splc", "-g", "{grammar}", "-o", "{llvm_out}", "{input}"],
+      "cmd": ["{root}/splc", "-o", "{llvm_out}", "{input}"],
       "out": "{llvm_out}",
       "preprocess": [
         {"type": "llvm"}
