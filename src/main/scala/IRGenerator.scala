@@ -81,7 +81,7 @@ object IRGenerator {
         emitInstr(s"  store i64 $valReg, ptr $ptrReg, align 8")
         addIdentPtr(ident.lexeme, ptrReg)
 
-      case Stmt.Assign(ident, value) =>
+      case Stmt.Assign(ident, _, value) =>
         val valReg = genExpr(value)
         val ptrReg = getIdentPtr(ident.lexeme)
         emitInstr(s"  store i64 $valReg, ptr $ptrReg, align 8")

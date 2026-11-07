@@ -48,11 +48,11 @@ def parseStmt(state: ParserState): (Stmt, ParserState) = state.tokens match {
 
     case (kw: (Token.Val | Token.Var)) :: (ident: Token.Ident) :: tail =>
       val msg = s"Parser error at ${ident.line}:${ident.column}: '=' expected after declaration"
-      (Stmt.Decl(kw, ident, Expr.ErrorExpr(ident)), state.withErrorAndSync(msg, tail))
+      (Stmt.Decl(kw, ident, Expr.ErrorExpr(ident)), state.next(tail).withError(msg))
 
-    case (ident: Token.Ident) :: (_: Token.Assign) :: tail =>
+    case (ident: Token.Ident) :: (assign: Token.Assign) :: tail =>
       val (expr, nextState) = parseExpr(0, state.next(tail))
-      (Stmt.Assign(ident, expr), nextState)
+      (Stmt.Assign(ident, assign, expr), nextState)
 
     case (_: Token.IntTok | _: Token.Ident | _: Token.Minus | _: Token.Lparen) :: _ =>
       val (expr, nextState) = parseExpr(0, state)
@@ -60,7 +60,7 @@ def parseStmt(state: ParserState): (Stmt, ParserState) = state.tokens match {
 
     case (badToken: Token) :: tail =>
       val msg = badToken match {
-        case err: Token.ErrorTok => s"Error at $err.line:$err.column: $err.msg"
+        case err: Token.ErrorTok => s"Error at ${err.line}:${err.column}: ${err.msg}"
         case _ => s"Parser error at ${badToken.line}:${badToken.column}: unexpected token '${badToken.lexeme}'"
       }
       (Stmt.ErrorStmt(badToken), state.withErrorAndSync(msg, tail))
@@ -103,7 +103,7 @@ def parseExpr(minPrec: Int, state: ParserState): (Expr, ParserState) = {
     case head :: tail =>
       val prec = getPrec(head)
       if (prec > 0 && prec >= minPrec) {
-        val (rhs, nextState) = parseExpr(prec + 1, state.next(tail))
+        val (rhs, nextState) = parseExpr(prec + 1, currState.next(tail))
         precedenceClimbing(Expr.Binary(lhs, head, rhs), nextState)
       } else (lhs, currState)
 
@@ -143,11 +143,11 @@ def expectRparen(expr: Expr, state: ParserState): (Expr, ParserState) = state.to
     
   case unexpected :: _ =>
     val msg = s"Error at ${unexpected.line}:${unexpected.column}: ')' expected, but '${unexpected.lexeme}' found"
-    (expr, state.withError(msg))
+    (Expr.ErrorExpr(unexpected), state.withError(msg))
     
   case Nil =>
     val msg = "Compiler error: token stream unexpectedly exhausted"
-    (expr, state.withError(msg))
+    (Expr.ErrorExpr(Token.Eof(0, 0)), state.withError(msg))
 }
 
 def getPrec(token: Token): Int = token match {

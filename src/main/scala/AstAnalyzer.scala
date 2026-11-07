@@ -17,7 +17,7 @@ object AstAnalyzer {
         stateAfterValue.withError(s"Semantic error at ${ident.line}:${ident.column}: '${ident.lexeme}' is already defined")
       }
 
-    case Stmt.Assign(ident, value) =>
+    case Stmt.Assign(ident, _, value) =>
       val stateAfterIdent =
         if (!state.symbolTable.contains(ident.lexeme)) {
           state.withError(s"Semantic error at ${ident.line}:${ident.column}: '${ident.lexeme}' not found")

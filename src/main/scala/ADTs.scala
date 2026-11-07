@@ -7,11 +7,11 @@ enum Stmt(val startToken: Token) extends Coords {
   def line: Int = startToken.line
   def column: Int = startToken.column
 
-  case Return(keyWord: Token, expr: Expr)               extends Stmt(keyWord)
-  case Decl(keyWord: Token, ident: Token, value: Expr)  extends Stmt(keyWord)
-  case Assign(ident: Token, value: Expr)                extends Stmt(ident)
-  case ExprStmt(expr: Expr)                             extends Stmt(expr.startToken)
-  case ErrorStmt(token: Token)                          extends Stmt(token)
+  case Return(keyWord: Token, expr: Expr)                       extends Stmt(keyWord)
+  case Decl(keyWord: Token, ident: Token, value: Expr)          extends Stmt(keyWord)
+  case Assign(ident: Token, assign: Token.Assign, value: Expr)  extends Stmt(ident)
+  case ExprStmt(expr: Expr)                                     extends Stmt(expr.startToken)
+  case ErrorStmt(token: Token)                                  extends Stmt(token)
 }
 
 enum Expr(val startToken: Token) extends Coords {

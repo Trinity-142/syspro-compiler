@@ -24,9 +24,9 @@ object AstSerializer {
     case Stmt.Return(kw, value) =>
       s"""{"line": ${kw.line}, "column": ${kw.column}, "kind": "Return", "elems": [${exprToJson(value)}]}"""
 
-    case Stmt.Assign(ident, value) =>
+    case Stmt.Assign(ident, assign, value) =>
       val identJson = s"""{"line": ${ident.line}, "column": ${ident.column}, "kind": "Ident", "elems": []}"""
-      s"""{"line": ${ident.line}, "column": ${ident.column}, "kind": "Assign", "elems": [$identJson,${exprToJson(value)}]}"""
+      s"""{"line": ${assign.line}, "column": ${assign.column}, "kind": "Assign", "elems": [$identJson,${exprToJson(value)}]}"""
 
     case Stmt.ExprStmt(expr) =>
       exprToJson(expr)
