@@ -5,36 +5,37 @@ target triple = "x86_64-unknown-linux-gnu"
 
 define i64 @main() {
 entry:
-  %x = alloca i64, align 8
-  store i64 1, ptr %x, align 8
-  %y = alloca i64, align 8
-  store i64 0, ptr %y, align 8
-  %r = alloca i64, align 8
-  store i64 0, ptr %r, align 8
-  %x1 = load i64, ptr %x, align 8
-  %cmptmp = icmp eq i64 %x1, 0
-  %zexttmp = zext i1 %cmptmp to i64
-  %lbool = icmp ne i64 %zexttmp, 0
-  br i1 %lbool, label %logic.rhs, label %logic.end
-
-logic.rhs:                                        ; preds = %entry
-  %y2 = load i64, ptr %y, align 8
-  %cmptmp3 = icmp eq i64 %y2, 0
-  %zexttmp4 = zext i1 %cmptmp3 to i64
-  %rbool = icmp ne i64 %zexttmp4, 0
-  br label %logic.end
-
-logic.end:                                        ; preds = %logic.rhs, %entry
-  %logictmp = phi i1 [ false, %entry ], [ %rbool, %logic.rhs ]
-  %logicext = zext i1 %logictmp to i64
-  %ifcond = icmp ne i64 %logicext, 0
-  br i1 %ifcond, label %then, label %ifmerge
-
-then:                                             ; preds = %logic.end
-  store i64 1, ptr %r, align 8
-  br label %ifmerge
-
-ifmerge:                                          ; preds = %then, %logic.end
-  %r5 = load i64, ptr %r, align 8
-  ret i64 %r5
+  %1 = alloca i64, align 8
+  store i64 1, ptr %1, align 8
+  %2 = alloca i64, align 8
+  store i64 0, ptr %2, align 8
+  %3 = alloca i64, align 8
+  store i64 0, ptr %3, align 8
+  %4 = alloca i1
+  %5 = load i64, ptr %1, align 8
+  %6 = icmp eq i64 %5, 0
+  %7 = zext i1 %6 to i64
+  %8 = icmp ne i64 %7, 0
+  br i1 %8, label %and.rhs.1, label %and.false.2
+and.false.2:
+  store i1 false, ptr %4
+  br label %and.end.3
+and.rhs.1:
+  %9 = load i64, ptr %2, align 8
+  %10 = icmp eq i64 %9, 0
+  %11 = zext i1 %10 to i64
+  %12 = icmp ne i64 %11, 0
+  store i1 %12, ptr %4
+  br label %and.end.3
+and.end.3:
+  %13 = load i1, ptr %4
+  %14 = zext i1 %13 to i64
+  %15 = icmp ne i64 %14, 0
+  br i1 %15, label %if.then.4, label %if.end.5
+if.then.4:
+  store i64 1, ptr %3, align 8
+  br label %if.end.5
+if.end.5:
+  %16 = load i64, ptr %3, align 8
+  ret i64 %16
 }

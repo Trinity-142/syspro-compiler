@@ -1,5 +1,8 @@
 object AstAnalyzer {
-  case class AnalyzerState(symbolTable: Map[String, Boolean] = Map.empty, errors: List[String] = Nil) {
+  case class AnalyzerState(
+    symbolTable: Map[String, Boolean] = Map.empty,
+    errors: List[String] = Nil,
+    loopDepth: Int = 0) {
     def withError(msg: String): AnalyzerState = this.copy(errors = msg :: this.errors)
   }
   
@@ -28,6 +31,38 @@ object AstAnalyzer {
         }
       analyze(stateAfterIdent, value)
 
+    case Stmt.If(_, cond, thenBranch, elseBranch) =>
+      val stateAfterCond = analyze(state, cond)
+      val stateAfterThen = analyze(stateAfterCond, thenBranch)
+      val stateWithThenErrors = stateAfterCond.copy(errors = stateAfterThen.errors)
+
+      elseBranch match {
+        case Some(elseStmt) =>
+          val stateAfterElse = analyze(stateWithThenErrors, elseStmt)
+          stateWithThenErrors.copy(errors = stateAfterElse.errors)
+        case None =>
+          stateWithThenErrors
+      }
+
+    case Stmt.While(_, cond, body) =>
+      val stateAfterCond = analyze(state, cond)
+      val stateAfterBody = analyze(stateAfterCond.copy(loopDepth = stateAfterCond.loopDepth + 1), body)
+      stateAfterCond.copy(errors = stateAfterBody.errors)
+
+    case Stmt.Break(kw) =>
+      if (state.loopDepth == 0) {
+        state.withError(s"Semantic error at ${kw.line}:${kw.column}: 'break' outside of loop")
+      } else state
+
+    case Stmt.Continue(kw) =>
+      if (state.loopDepth == 0) {
+        state.withError(s"Semantic error at ${kw.line}:${kw.column}: 'continue' outside of loop")
+      } else state
+
+    case Stmt.Block(_, stmts) =>
+      val stateAfterBlock = stmts.foldLeft(state)((acc, s) => analyze(acc, s))
+      state.copy(errors = stateAfterBlock.errors)
+
     case Stmt.Return(_, expr) => analyze(state, expr)
     case Stmt.ExprStmt(expr) => analyze(state, expr)
     case Stmt.ErrorStmt(_) => state
@@ -44,7 +79,7 @@ object AstAnalyzer {
     case Expr.Unary(_, expr) =>
       analyze(state, expr)
 
-    case _: (Expr.IntLiteral | Expr.ErrorExpr) =>
+    case _: (Expr.IntLiteral | Expr.BoolLiteral | Expr.ErrorExpr) =>
       state
   }
 }

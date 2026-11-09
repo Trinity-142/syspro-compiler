@@ -5,9 +5,9 @@ target triple = "x86_64-unknown-linux-gnu"
 
 define i64 @main() {
 entry:
-  %6 = alloca i64, align 8
-  store i64 -2, ptr %6, align 8
-  %7 = load i64, ptr %6, align 8
-  %8 = sub i64 0, %7
-  ret i64 %8
+  %1 = alloca i64, align 8
+  store i64 -2, ptr %1, align 8
+  %2 = load i64, ptr %1, align 8
+  %3 = sub i64 0, %2
+  ret i64 %3
 }

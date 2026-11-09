@@ -5,42 +5,36 @@ target triple = "x86_64-unknown-linux-gnu"
 
 define i64 @main() {
 entry:
-  %i = alloca i64, align 8
-  store i64 0, ptr %i, align 8
-  br label %while_header
-
-while_header:                                     ; preds = %while_end4, %entry
-  %i1 = load i64, ptr %i, align 8
-  %cmptmp = icmp slt i64 %i1, 10
-  %zexttmp = zext i1 %cmptmp to i64
-  %whilecond = icmp ne i64 %zexttmp, 0
-  br i1 %whilecond, label %while_body, label %while_end
-
-while_body:                                       ; preds = %while_header
-  %j = alloca i64, align 8
-  store i64 0, ptr %j, align 8
-  br label %while_header2
-
-while_end:                                        ; preds = %while_header
-  %i12 = load i64, ptr %i, align 8
-  ret i64 %i12
-
-while_header2:                                    ; preds = %while_body3, %while_body
-  %j5 = load i64, ptr %j, align 8
-  %cmptmp6 = icmp slt i64 %j5, 10
-  %zexttmp7 = zext i1 %cmptmp6 to i64
-  %whilecond8 = icmp ne i64 %zexttmp7, 0
-  br i1 %whilecond8, label %while_body3, label %while_end4
-
-while_body3:                                      ; preds = %while_header2
-  %j9 = load i64, ptr %j, align 8
-  %addtmp = add i64 %j9, 1
-  store i64 %addtmp, ptr %j, align 8
-  br label %while_header2
-
-while_end4:                                       ; preds = %while_header2
-  %i10 = load i64, ptr %i, align 8
-  %addtmp11 = add i64 %i10, 1
-  store i64 %addtmp11, ptr %i, align 8
-  br label %while_header
+  %1 = alloca i64, align 8
+  store i64 0, ptr %1, align 8
+  br label %while.cond.1
+while.cond.1:
+  %2 = load i64, ptr %1, align 8
+  %3 = icmp slt i64 %2, 10
+  %4 = zext i1 %3 to i64
+  %5 = icmp ne i64 %4, 0
+  br i1 %5, label %while.body.2, label %while.end.3
+while.body.2:
+  %6 = alloca i64, align 8
+  store i64 0, ptr %6, align 8
+  br label %while.cond.4
+while.cond.4:
+  %7 = load i64, ptr %6, align 8
+  %8 = icmp slt i64 %7, 10
+  %9 = zext i1 %8 to i64
+  %10 = icmp ne i64 %9, 0
+  br i1 %10, label %while.body.5, label %while.end.6
+while.body.5:
+  %11 = load i64, ptr %6, align 8
+  %12 = add i64 %11, 1
+  store i64 %12, ptr %6, align 8
+  br label %while.cond.4
+while.end.6:
+  %13 = load i64, ptr %1, align 8
+  %14 = add i64 %13, 1
+  store i64 %14, ptr %1, align 8
+  br label %while.cond.1
+while.end.3:
+  %15 = load i64, ptr %1, align 8
+  ret i64 %15
 }

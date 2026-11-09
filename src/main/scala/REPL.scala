@@ -94,6 +94,12 @@ object REPL {
 
       case Some(Stmt.ErrorStmt(token)) =>
         Left(List(s"Error at ${token.line}:${token.column}"))
+        
+      case Some(Stmt.If(_, _, _, _)) => ???
+      case Some(Stmt.While(_, _, _)) => ???
+      case Some(Stmt.Break(_)) => ???
+      case Some(Stmt.Continue(_)) => ???
+      case Some(Stmt.Block(_, _)) => ???
     }
   }
 

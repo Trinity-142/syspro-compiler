@@ -5,35 +5,29 @@ target triple = "x86_64-unknown-linux-gnu"
 
 define i64 @main() {
 entry:
-  %i = alloca i64, align 8
-  store i64 0, ptr %i, align 8
-  br label %while_header
-
-while_header:                                     ; preds = %ifmerge, %entry
-  %i1 = load i64, ptr %i, align 8
-  %cmptmp = icmp slt i64 %i1, 10
-  %zexttmp = zext i1 %cmptmp to i64
-  %whilecond = icmp ne i64 %zexttmp, 0
-  br i1 %whilecond, label %while_body, label %while_end
-
-while_body:                                       ; preds = %while_header
-  %i2 = load i64, ptr %i, align 8
-  %cmptmp3 = icmp eq i64 %i2, 5
-  %zexttmp4 = zext i1 %cmptmp3 to i64
-  %ifcond = icmp ne i64 %zexttmp4, 0
-  br i1 %ifcond, label %then, label %ifmerge
-
-while_end:                                        ; preds = %then, %while_header
-  %i6 = load i64, ptr %i, align 8
-  ret i64 %i6
-
-then:                                             ; preds = %while_body
-  br label %while_end
-  br label %ifmerge
-
-ifmerge:                                          ; preds = %then, %while_body
-  %i5 = load i64, ptr %i, align 8
-  %addtmp = add i64 %i5, 1
-  store i64 %addtmp, ptr %i, align 8
-  br label %while_header
+  %1 = alloca i64, align 8
+  store i64 0, ptr %1, align 8
+  br label %while.cond.1
+while.cond.1:
+  %2 = load i64, ptr %1, align 8
+  %3 = icmp slt i64 %2, 10
+  %4 = zext i1 %3 to i64
+  %5 = icmp ne i64 %4, 0
+  br i1 %5, label %while.body.2, label %while.end.3
+while.body.2:
+  %6 = load i64, ptr %1, align 8
+  %7 = icmp eq i64 %6, 5
+  %8 = zext i1 %7 to i64
+  %9 = icmp ne i64 %8, 0
+  br i1 %9, label %if.then.4, label %if.end.5
+if.then.4:
+  br label %while.end.3
+if.end.5:
+  %10 = load i64, ptr %1, align 8
+  %11 = add i64 %10, 1
+  store i64 %11, ptr %1, align 8
+  br label %while.cond.1
+while.end.3:
+  %12 = load i64, ptr %1, align 8
+  ret i64 %12
 }

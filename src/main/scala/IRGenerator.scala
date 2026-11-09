@@ -4,7 +4,9 @@ import scala.util.Try
 object IRGenerator {
   def generate(stmts: List[Stmt]): List[String] = {
     var nextRegId = 1
+    var nextLabelId = 1
     var identToMem = Map.empty[String, String]
+    var loopStack = List.empty[(String, String)]
     val instructions = ListBuffer.empty[String]
 
     // ------------ UTILITIES ------------
@@ -14,8 +16,25 @@ object IRGenerator {
       regName
     }
 
+    def getNextLabel(prefix: String): String = {
+      val labelName = s"$prefix.$nextLabelId"
+      nextLabelId += 1
+      labelName
+    }
+
     def emitInstr(instr: String): Unit = {
       instructions += instr
+    }
+
+    def emitBrAndLabel(targetLabel: String, nextLabel: String): Unit = {
+      val lastLine = instructions.lastOption.map(_.split('\n').last.trim).getOrElse("")
+      if (lastLine.startsWith("ret ") || lastLine.startsWith("br ")) {
+        emitInstr(s"$nextLabel:")
+      } else {
+        emitInstr(
+          s"""  br label %$targetLabel
+             |$nextLabel:""".stripMargin)
+      }
     }
 
     def getIdentPtr(name: String): String = {
@@ -26,30 +45,112 @@ object IRGenerator {
       identToMem += (name -> ptrReg)
     }
 
+    def genCond(expr: Expr): String = {
+      val value = genExpr(expr)
+      val condReg = getNextReg
+      emitInstr(s"  $condReg = icmp ne i64 $value, 0")
+      condReg
+    }
+
     // ------------ EXPRESSIONS ------------
     def genExpr(expr: Expr): String = expr match {
+      case Expr.Binary(left, _: Token.And, right) =>
+        val ptrReg = getNextReg
+        emitInstr(s"  $ptrReg = alloca i1")
+
+        val lhsCond = genCond(left)
+        val rhsLabel = getNextLabel("and.rhs")
+        val falseLabel = getNextLabel("and.false")
+        val endLabel = getNextLabel("and.end")
+        emitInstr(
+          s"""  br i1 $lhsCond, label %$rhsLabel, label %$falseLabel
+             |$falseLabel:
+             |  store i1 false, ptr $ptrReg
+             |  br label %$endLabel
+             |$rhsLabel:""".stripMargin)
+
+        val rhsCond = genCond(right)
+        val tmp = getNextReg
+        val resReg = getNextReg
+        emitInstr(
+          s"""  store i1 $rhsCond, ptr $ptrReg
+             |  br label %$endLabel
+             |$endLabel:
+             |  $tmp = load i1, ptr $ptrReg
+             |  $resReg = zext i1 $tmp to i64""".stripMargin)
+        resReg
+
+      case Expr.Binary(left, _: Token.Or, right) =>
+        val ptrReg = getNextReg
+        emitInstr(s"  $ptrReg = alloca i1")
+
+        val lhsCond = genCond(left)
+        val rhsLabel = getNextLabel("or.rhs")
+        val trueLabel = getNextLabel("or.true")
+        val endLabel = getNextLabel("or.end")
+        emitInstr(
+          s"""  br i1 $lhsCond, label %$trueLabel, label %$rhsLabel
+             |$trueLabel:
+             |  store i1 true, ptr $ptrReg
+             |  br label %$endLabel
+             |$rhsLabel:""".stripMargin)
+
+        val rhsCond = genCond(right)
+        val tmp = getNextReg
+        val resReg = getNextReg
+        emitInstr(
+          s"""  store i1 $rhsCond, ptr $ptrReg
+             |  br label %$endLabel
+             |$endLabel:
+             |  $tmp = load i1, ptr $ptrReg
+             |  $resReg = zext i1 $tmp to i64""".stripMargin)
+        resReg
+
       case Expr.Binary(left, op, right) =>
         val lhs = genExpr(left)
         val rhs = genExpr(right)
-        val resReg = getNextReg
 
         tryFoldConstants(lhs, op, rhs) match {
           case Some(str) => str
-          case _ => {
-            val irOp = op match {
-              case _: Token.Plus => "add"
-              case _: Token.Minus => "sub"
-              case _: Token.Div => "sdiv"
-              case _: Token.Mult => "mul"
-              case _ => ???
-            }
-            emitInstr(s"  $resReg = $irOp i64 $lhs, $rhs")
-            resReg
+          case _ => op match {
+            case _: Token.Plus | _: Token.Minus | _: Token.Mult | _: Token.Div =>
+              val irOp = op match {
+                case _: Token.Plus  => "add"
+                case _: Token.Minus => "sub"
+                case _: Token.Div   => "sdiv"
+                case _: Token.Mult  => "mul"
+                case _              => ???
+              }
+              val resReg = getNextReg
+              emitInstr(s"  $resReg = $irOp i64 $lhs, $rhs")
+              resReg
+
+            case _: Token.Eq | _: Token.Ne | _: Token.Lt | _: Token.Gt | _: Token.Le | _: Token.Ge =>
+              val cmpPred = op match {
+                case _: Token.Eq => "eq"
+                case _: Token.Ne => "ne"
+                case _: Token.Lt => "slt"
+                case _: Token.Gt => "sgt"
+                case _: Token.Le => "sle"
+                case _: Token.Ge => "sge"
+                case _           => ???
+              }
+              val tmp = getNextReg
+              val resReg = getNextReg
+              emitInstr(
+                s"""  $tmp = icmp $cmpPred i64 $lhs, $rhs
+                   |  $resReg = zext i1 $tmp to i64""".stripMargin)
+              resReg
+
+            case _ => ???
           }
         }
 
       case Expr.IntLiteral(value, _) =>
         value.toString
+
+      case Expr.BoolLiteral(value, _) =>
+        if (value) "1" else "0"
 
       case Expr.Ident(ident) =>
         val ptrReg = getIdentPtr(ident.lexeme)
@@ -59,15 +160,29 @@ object IRGenerator {
 
       case Expr.Unary(op, expr) =>
         val rhs = genExpr(expr)
-        val resReg = getNextReg
 
-        val irOp = op match {
-          case _: Token.Minus => "sub"
+        op match {
+          case _: Token.Minus => rhs.toLongOption match {
+            case Some(value) => (-value).toString
+            case None =>
+              val resReg = getNextReg
+              emitInstr(s"  $resReg = sub i64 0, $rhs")
+              resReg
+          }
+
+          case _: Token.Not => rhs.toLongOption match {
+            case Some(value) => if (value == 0) "1" else "0"
+            case None =>
+              val tmp = getNextReg
+              val resReg = getNextReg
+              emitInstr(
+                s"""  $tmp = icmp eq i64 $rhs, 0
+                   |  $resReg = zext i1 $tmp to i64""".stripMargin)
+              resReg
+          }
+
           case _ => ???
         }
-
-        emitInstr(s"  $resReg = sub i64 0, $rhs")
-        resReg
 
       case Expr.ErrorExpr(_) => ???
     }
@@ -77,8 +192,9 @@ object IRGenerator {
       case Stmt.Decl(kw, ident, value) =>
         val valReg = genExpr(value)
         val ptrReg = getNextReg
-        emitInstr(s"  $ptrReg = alloca i64, align 8")
-        emitInstr(s"  store i64 $valReg, ptr $ptrReg, align 8")
+        emitInstr(
+          s"""  $ptrReg = alloca i64, align 8
+             |  store i64 $valReg, ptr $ptrReg, align 8""".stripMargin)
         addIdentPtr(ident.lexeme, ptrReg)
 
       case Stmt.Assign(ident, _, value) =>
@@ -93,6 +209,77 @@ object IRGenerator {
       case Stmt.ExprStmt(expr) =>
         genExpr(expr)
 
+      case Stmt.Block(_, stmts) =>
+        val envSnap = identToMem
+        stmts.foreach(genStmt)
+        identToMem = envSnap
+
+      case Stmt.If(_, cond, thenBranch, elseBranch) =>
+        val condReg = genCond(cond)
+        val thenLabel = getNextLabel("if.then")
+        val endLabel = getNextLabel("if.end")
+
+        elseBranch match {
+          case Some(elseStmt) =>
+            val elseLabel = getNextLabel("if.else")
+            emitInstr(
+              s"""  br i1 $condReg, label %$thenLabel, label %$elseLabel
+                 |$thenLabel:""".stripMargin)
+
+            val envSnapThen = identToMem
+            genStmt(thenBranch)
+            identToMem = envSnapThen
+
+            emitBrAndLabel(endLabel, elseLabel)
+
+            val envSnapElse = identToMem
+            genStmt(elseStmt)
+            identToMem = envSnapElse
+
+            emitBrAndLabel(endLabel, endLabel)
+
+          case None =>
+            emitInstr(
+              s"""  br i1 $condReg, label %$thenLabel, label %$endLabel
+                 |$thenLabel:""".stripMargin)
+
+            val envSnapThen = identToMem
+            genStmt(thenBranch)
+            identToMem = envSnapThen
+
+            emitBrAndLabel(endLabel, endLabel)
+        }
+
+      case Stmt.While(_, cond, body) =>
+        val condLabel = getNextLabel("while.cond")
+        val bodyLabel = getNextLabel("while.body")
+        val endLabel = getNextLabel("while.end")
+
+        emitInstr(
+          s"""  br label %$condLabel
+             |$condLabel:""".stripMargin)
+
+        val condReg = genCond(cond)
+        emitInstr(
+          s"""  br i1 $condReg, label %$bodyLabel, label %$endLabel
+             |$bodyLabel:""".stripMargin)
+
+        val savedEnv = identToMem
+        loopStack = (condLabel, endLabel) :: loopStack
+        genStmt(body)
+        loopStack = loopStack.tail
+        identToMem = savedEnv
+
+        emitBrAndLabel(condLabel, endLabel)
+
+      case Stmt.Break(_) =>
+        val (_, endLabel) = loopStack.head
+        emitInstr(s"  br label %$endLabel")
+
+      case Stmt.Continue(_) =>
+        val (condLabel, _) = loopStack.head
+        emitInstr(s"  br label %$condLabel")
+
       case Stmt.ErrorStmt(_) => ???
     }
 
@@ -102,11 +289,17 @@ object IRGenerator {
 
   private def tryFoldConstants(lhs: String, op: Token, rhs: String): Option[String] = (lhs.toLongOption, rhs.toLongOption) match {
     case (Some(x), Some(y)) => op match {
-      case _: Token.Plus => Some((x + y).toString)
+      case _: Token.Plus  => Some((x + y).toString)
       case _: Token.Minus => Some((x - y).toString)
-      case _: Token.Mult => Some((x * y).toString)
-      case _: Token.Div => Try(x / y).map(_.toString).toOption
-      case _ => None
+      case _: Token.Mult  => Some((x * y).toString)
+      case _: Token.Div   => Try(x / y).map(_.toString).toOption
+      case _: Token.Eq    => Some(if (x == y) "1" else "0")
+      case _: Token.Ne    => Some(if (x != y) "1" else "0")
+      case _: Token.Lt    => Some(if (x < y) "1" else "0")
+      case _: Token.Gt    => Some(if (x > y) "1" else "0")
+      case _: Token.Le    => Some(if (x <= y) "1" else "0")
+      case _: Token.Ge    => Some(if (x >= y) "1" else "0")
+      case _              => None
     }
     case _ => None
   }

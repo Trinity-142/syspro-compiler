@@ -9,6 +9,9 @@ object AstSerializer {
     case Expr.IntLiteral(_, token) =>
       s"""{"line": ${token.line}, "column": ${token.column}, "kind": "IntLiteral", "elems": []}"""
 
+    case Expr.BoolLiteral(_, token) =>
+      s"""{"line": ${token.line}, "column": ${token.column}, "kind": "BoolLiteral", "elems": []}"""
+
     case Expr.Ident(token) =>
       s"""{"line": ${token.line}, "column": ${token.column}, "kind": "Ident", "elems": []}"""
 
@@ -27,6 +30,26 @@ object AstSerializer {
     case Stmt.Assign(ident, assign, value) =>
       val identJson = s"""{"line": ${ident.line}, "column": ${ident.column}, "kind": "Ident", "elems": []}"""
       s"""{"line": ${assign.line}, "column": ${assign.column}, "kind": "Assign", "elems": [$identJson,${exprToJson(value)}]}"""
+
+    case Stmt.If(kw, cond, thenBranch, elseBranch) =>
+      val elems = elseBranch match {
+        case Some(elseStmt) => s"${exprToJson(cond)},${stmtToJson(thenBranch)},${stmtToJson(elseStmt)}"
+        case None           => s"${exprToJson(cond)},${stmtToJson(thenBranch)}"
+      }
+      s"""{"line": ${kw.line}, "column": ${kw.column}, "kind": "If", "elems": [$elems]}"""
+
+    case Stmt.While(kw, cond, body) =>
+      s"""{"line": ${kw.line}, "column": ${kw.column}, "kind": "While", "elems": [${exprToJson(cond)},${stmtToJson(body)}]}"""
+
+    case Stmt.Break(kw) =>
+      s"""{"line": ${kw.line}, "column": ${kw.column}, "kind": "Break", "elems": []}"""
+
+    case Stmt.Continue(kw) =>
+      s"""{"line": ${kw.line}, "column": ${kw.column}, "kind": "Continue", "elems": []}"""
+
+    case Stmt.Block(lbrace, stmts) =>
+      val elems = stmts.map(stmtToJson).mkString(",")
+      s"""{"line": ${lbrace.line}, "column": ${lbrace.column}, "kind": "Block", "elems": [$elems]}"""
 
     case Stmt.ExprStmt(expr) =>
       exprToJson(expr)
