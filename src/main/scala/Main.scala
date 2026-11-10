@@ -31,6 +31,8 @@ import scala.sys.process.*
       case "-o" =>
         llvmOut = args(i + 1)
         i += 2
+      case "-g" =>
+        i += 2
       case arg if !arg.startsWith("-") =>
         inputPath = arg
         i += 1
