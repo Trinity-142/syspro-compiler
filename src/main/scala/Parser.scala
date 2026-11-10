@@ -144,7 +144,7 @@ def expectRparen(expr: Expr, state: ParserState): (Expr, ParserState) = state.to
   case unexpected :: _ =>
     val msg = s"Error at ${unexpected.line}:${unexpected.column}: ')' expected, but '${unexpected.lexeme}' found"
     (Expr.ErrorExpr(unexpected), state.withError(msg))
-    
+
   case Nil =>
     val msg = "Compiler error: token stream unexpectedly exhausted"
     (Expr.ErrorExpr(Token.Eof(0, 0)), state.withError(msg))
