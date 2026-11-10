@@ -27,7 +27,7 @@
       ]
     },
     "compiler": {
-      "cmd": ["{root}/build/splc", "-g", "{grammar}", "-o", "{exe}", "{input}"]
+      "cmd": ["{root}/splc", "-g", "{grammar}", "-o", "{exe}", "{input}"]
     },
     "run": {
       "cmd": ["{exe}"],

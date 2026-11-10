@@ -90,7 +90,7 @@ import scala.sys.process.*
       sys.exit(1)
     }
 
-    // ------------ IR GENERATOR ------------
+    // ------------ IR GENERATOR & COMPILATION ------------
     if (llvmOut.nonEmpty) {
       val instructions = IRGenerator.generate(parsedAst)
       val header =
@@ -104,20 +104,23 @@ import scala.sys.process.*
       val body = instructions.mkString("\n")
       val llvmIR = s"$header\n$body\n}\n"
 
-      Using(PrintWriter(File(llvmOut))) { writer =>
-        writer.write(llvmIR)
+      if (llvmOut.endsWith(".ll")) {
+        Using(PrintWriter(File(llvmOut))) { writer =>
+          writer.write(llvmIR)
+        }
+      } else {
+        val tmpllFile = File.createTempFile("prog", ".ll")
+        tmpllFile.deleteOnExit()
+        Using(PrintWriter(tmpllFile)) { writer =>
+          writer.write(llvmIR)
+        }
+        val compileCommand = s"clang -Wno-override-module ${tmpllFile.getAbsolutePath} -o $llvmOut"
+        val compileExitCode = compileCommand.!
+        if (compileExitCode != 0) {
+          System.err.println("LLVM IR compilation error")
+          sys.exit(1)
+        }
       }
-    }
-
-    // ------------ COMPILE AND RUN ------------
-    val binPath = llvmOut.stripSuffix(".ll")
-    val compileCommand = s"clang -Wno-override-module $llvmOut -o $binPath"
-    val compileExitCode = compileCommand.!
-    if (compileExitCode == 0) {
-      val output = s"./$binPath".!
-      println(output)
-    } else {
-      System.err.println("LLVM IR compilation error")
     }
   }
 }
