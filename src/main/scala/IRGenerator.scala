@@ -10,8 +10,8 @@ object IRGenerator {
     val instructions = ListBuffer.empty[String]
 
     // ------------ UTILITIES ------------
-    def getNextReg: String = {
-      val regName = s"%$nextRegId"
+    def getNextReg(prefix: String = ""): String = {
+      val regName = if (prefix.nonEmpty) s"%$prefix.$nextRegId" else s"$nextRegId"
       nextRegId += 1
       regName
     }
@@ -47,62 +47,62 @@ object IRGenerator {
 
     def genCond(expr: Expr): String = {
       val value = genExpr(expr)
-      val condReg = getNextReg
+      val condReg = getNextReg("logictmp")
       emitInstr(s"  $condReg = icmp ne i64 $value, 0")
       condReg
+    }
+
+    def getCurrentLabel: String = {
+      instructions.reverseIterator
+        .flatMap(_.linesIterator.toSeq.reverseIterator)
+        .find(_.endsWith(":"))
+        .getOrElse("entry:")
+        .stripSuffix(":")
     }
 
     // ------------ EXPRESSIONS ------------
     def genExpr(expr: Expr): String = expr match {
       case Expr.Binary(left, _: Token.And, right) =>
-        val ptrReg = getNextReg
-        emitInstr(s"  $ptrReg = alloca i1")
-
         val lhsCond = genCond(left)
+        val lhsLabelEnd = getCurrentLabel
         val rhsLabel = getNextLabel("and.rhs")
-        val falseLabel = getNextLabel("and.false")
         val endLabel = getNextLabel("and.end")
         emitInstr(
-          s"""  br i1 $lhsCond, label %$rhsLabel, label %$falseLabel
-             |$falseLabel:
-             |  store i1 false, ptr $ptrReg
-             |  br label %$endLabel
+          s"""  br i1 $lhsCond, label %$rhsLabel, label %$endLabel
+             |
              |$rhsLabel:""".stripMargin)
 
         val rhsCond = genCond(right)
-        val tmp = getNextReg
-        val resReg = getNextReg
+        val rhsLabelEnd = getCurrentLabel
+        val tmp = getNextReg("phitmp")
+        val resReg = getNextReg("phizext")
         emitInstr(
-          s"""  store i1 $rhsCond, ptr $ptrReg
-             |  br label %$endLabel
+          s"""  br label %$endLabel
+             |
              |$endLabel:
-             |  $tmp = load i1, ptr $ptrReg
+             |  $tmp = phi i1 [ false, %$lhsLabelEnd ], [ $rhsCond, %$rhsLabelEnd ]
              |  $resReg = zext i1 $tmp to i64""".stripMargin)
         resReg
 
       case Expr.Binary(left, _: Token.Or, right) =>
-        val ptrReg = getNextReg
-        emitInstr(s"  $ptrReg = alloca i1")
-
         val lhsCond = genCond(left)
+        val lhsLabelEnd = getCurrentLabel
         val rhsLabel = getNextLabel("or.rhs")
-        val trueLabel = getNextLabel("or.true")
         val endLabel = getNextLabel("or.end")
         emitInstr(
-          s"""  br i1 $lhsCond, label %$trueLabel, label %$rhsLabel
-             |$trueLabel:
-             |  store i1 true, ptr $ptrReg
-             |  br label %$endLabel
+          s"""  br i1 $lhsCond, label %$endLabel, label %$rhsLabel
+             |
              |$rhsLabel:""".stripMargin)
 
         val rhsCond = genCond(right)
-        val tmp = getNextReg
-        val resReg = getNextReg
+        val rhsLabelEnd = getCurrentLabel
+        val tmp = getNextReg("phitmp")
+        val resReg = getNextReg("phizext")
         emitInstr(
-          s"""  store i1 $rhsCond, ptr $ptrReg
-             |  br label %$endLabel
+          s"""  br label %$endLabel
+             |
              |$endLabel:
-             |  $tmp = load i1, ptr $ptrReg
+             |  $tmp = phi i1 [ true, %$lhsLabelEnd ], [ $rhsCond, %$rhsLabelEnd ]
              |  $resReg = zext i1 $tmp to i64""".stripMargin)
         resReg
 
@@ -121,7 +121,7 @@ object IRGenerator {
                 case _: Token.Mult  => "mul"
                 case _              => ???
               }
-              val resReg = getNextReg
+              val resReg = getNextReg(s"$irOp")
               emitInstr(s"  $resReg = $irOp i64 $lhs, $rhs")
               resReg
 
@@ -135,8 +135,8 @@ object IRGenerator {
                 case _: Token.Ge => "sge"
                 case _           => ???
               }
-              val tmp = getNextReg
-              val resReg = getNextReg
+              val tmp = getNextReg(s"${cmpPred}tmp")
+              val resReg = getNextReg(s"${cmpPred}zext")
               emitInstr(
                 s"""  $tmp = icmp $cmpPred i64 $lhs, $rhs
                    |  $resReg = zext i1 $tmp to i64""".stripMargin)
@@ -154,7 +154,7 @@ object IRGenerator {
 
       case Expr.Ident(ident) =>
         val ptrReg = getIdentPtr(ident.lexeme)
-        val resReg = getNextReg
+        val resReg = getNextReg(ident.lexeme)
         emitInstr(s"  $resReg = load i64, ptr $ptrReg, align 8")
         resReg
 
@@ -165,7 +165,7 @@ object IRGenerator {
           case _: Token.Minus => rhs.toLongOption match {
             case Some(value) => (-value).toString
             case None =>
-              val resReg = getNextReg
+              val resReg = getNextReg("unaryMinus")
               emitInstr(s"  $resReg = sub i64 0, $rhs")
               resReg
           }
@@ -173,8 +173,8 @@ object IRGenerator {
           case _: Token.Not => rhs.toLongOption match {
             case Some(value) => if (value == 0) "1" else "0"
             case None =>
-              val tmp = getNextReg
-              val resReg = getNextReg
+              val tmp = getNextReg("notTmp")
+              val resReg = getNextReg("not")
               emitInstr(
                 s"""  $tmp = icmp eq i64 $rhs, 0
                    |  $resReg = zext i1 $tmp to i64""".stripMargin)
@@ -191,7 +191,7 @@ object IRGenerator {
     def genStmt(stmt: Stmt): Unit = stmt match {
       case Stmt.Decl(kw, ident, value) =>
         val valReg = genExpr(value)
-        val ptrReg = getNextReg
+        val ptrReg = getNextReg(ident.lexeme)
         emitInstr(
           s"""  $ptrReg = alloca i64, align 8
              |  store i64 $valReg, ptr $ptrReg, align 8""".stripMargin)
