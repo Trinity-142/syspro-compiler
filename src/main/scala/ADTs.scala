@@ -3,6 +3,20 @@ trait Coords {
   def column: Int
 }
 
+enum TopDecl(val startToken: Token) extends Coords {
+  def line: Int = startToken.line
+  def column: Int = startToken.column
+
+  case FuncDecl(keyWord: Token.Def, 
+                ident: Token.Ident, 
+                params: List[Expr.Param], 
+                body: Stmt.Block)           extends TopDecl(keyWord)
+  case ExternDecl(keyWord: Token.Extern, 
+                  ident: Token.Ident, 
+                  params: List[Expr.Param]) extends TopDecl(keyWord)
+  case ErrorDecl(token: Token.ErrorTok)     extends TopDecl(token)
+}
+
 enum Stmt(val startToken: Token) extends Coords {
   def line: Int = startToken.line
   def column: Int = startToken.column
@@ -28,6 +42,8 @@ enum Expr(val startToken: Token) extends Coords {
   case IntLiteral(value: Long, token: Token)      extends Expr(token)
   case BoolLiteral(value: Boolean, token: Token)  extends Expr(token)
   case Ident(ident: Token)                        extends Expr(ident)
+  case Param(ident: Token.Ident)                  extends Expr(ident)
+  case Call(ident: Token.Ident, args: List[Expr]) extends Expr(ident)
   case ErrorExpr(token: Token)                    extends Expr(token)
 }
 
@@ -38,6 +54,7 @@ enum Token(val line: Int, val column: Int) extends Coords {
   case Rbrace(l: Int, c: Int)   extends Token(l, c)
   case Assign(l: Int, c: Int)   extends Token(l, c)
   case Semi(l: Int, c: Int)     extends Token(l, c)
+  case Comma(l: Int, c: Int)    extends Token(l, c)
   case Plus(l: Int, c: Int)     extends Token(l, c)
   case Minus(l: Int, c: Int)    extends Token(l, c)
   case Mult(l: Int, c: Int)     extends Token(l, c)
@@ -55,6 +72,8 @@ enum Token(val line: Int, val column: Int) extends Coords {
   case Val(l: Int, c: Int)      extends Token(l, c)
   case Var(l: Int, c: Int)      extends Token(l, c)
   case Return(l: Int, c: Int)   extends Token(l, c)
+  case Def(l: Int, c: Int)      extends Token(l, c)
+  case Extern(l: Int, c: Int)   extends Token(l, c)
   case If(l: Int, c: Int)       extends Token(l, c)
   case Else(l: Int, c: Int)     extends Token(l, c)
   case While(l: Int, c: Int)    extends Token(l, c)
@@ -75,6 +94,7 @@ enum Token(val line: Int, val column: Int) extends Coords {
     case _: Rbrace       => "}"
     case _: Assign       => "="
     case _: Semi         => ";"
+    case _: Comma        => ","
     case _: Plus         => "+"
     case _: Minus        => "-"
     case _: Mult         => "*"
@@ -91,6 +111,8 @@ enum Token(val line: Int, val column: Int) extends Coords {
     case _: Val          => "val"
     case _: Var          => "var"
     case _: Return       => "return"
+    case _: Def          => "def"
+    case _: Extern       => "extern"
     case _: If           => "if"
     case _: Else         => "else"
     case _: While        => "while"
@@ -111,6 +133,7 @@ enum Token(val line: Int, val column: Int) extends Coords {
     case _: Rbrace   => "RBRACE"
     case _: Assign   => "ASSIGN"
     case _: Semi     => "SEMI"
+    case _: Comma    => "COMMA"
     case _: Plus     => "PLUS"
     case _: Minus    => "MINUS"
     case _: Mult     => "MULT"
@@ -127,6 +150,8 @@ enum Token(val line: Int, val column: Int) extends Coords {
     case _: Val      => "VAL"
     case _: Var      => "VAR"
     case _: Return   => "RETURN"
+    case _: Def      => "DEF"
+    case _: Extern   => "EXTERN"
     case _: If       => "IF"
     case _: Else     => "ELSE"
     case _: While    => "WHILE"

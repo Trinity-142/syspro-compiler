@@ -2,16 +2,18 @@ import scala.annotation.tailrec
 
 object Lexer {
   private val keywords: Map[String, (Int, Int) => Token] = Map(
-    "val" -> Token.Val.apply,
-    "var" -> Token.Var.apply,
-    "return" -> Token.Return.apply,
-    "if" -> Token.If.apply,
-    "else" -> Token.Else.apply,
-    "while" -> Token.While.apply,
-    "break" -> Token.Break.apply,
-    "continue" -> Token.Continue.apply,
-    "true" -> Token.True.apply,
-    "false" -> Token.False.apply
+    "val"       -> Token.Val.apply,
+    "var"       -> Token.Var.apply,
+    "return"    -> Token.Return.apply,
+    "def"       -> Token.Def.apply,
+    "extern"    -> Token.Extern.apply,
+    "if"        -> Token.If.apply,
+    "else"      -> Token.Else.apply,
+    "while"     -> Token.While.apply,
+    "break"     -> Token.Break.apply,
+    "continue"  -> Token.Continue.apply,
+    "true"      -> Token.True.apply,
+    "false"     -> Token.False.apply
   )
 
   private val twoCharTokens: Map[(Char, Char), (Int, Int) => Token] = Map(
@@ -26,6 +28,7 @@ object Lexer {
   private val oneCharTokens: Map[Char, (Int, Int) => Token] = Map(
     '=' -> Token.Assign.apply,
     ';' -> Token.Semi.apply,
+    ',' -> Token.Comma.apply,
     '+' -> Token.Plus.apply,
     '-' -> Token.Minus.apply,
     '*' -> Token.Mult.apply,
