@@ -5,12 +5,10 @@ target triple = "x86_64-unknown-linux-gnu"
 
 define i64 @main() {
 entry:
-  br i1 true, label %then, label %ifmerge
-
-then:                                             ; preds = %entry
+  %1 = icmp ne i64 1, 0
+  br i1 %1, label %if.then.1, label %if.end.2
+if.then.1:
   ret i64 42
-  br label %ifmerge
-
-ifmerge:                                          ; preds = %then, %entry
+if.end.2:
   ret i64 0
 }

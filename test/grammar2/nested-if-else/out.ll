@@ -5,37 +5,31 @@ target triple = "x86_64-unknown-linux-gnu"
 
 define i64 @main() {
 entry:
-  %x = alloca i64, align 8
-  store i64 1, ptr %x, align 8
-  %y = alloca i64, align 8
-  store i64 0, ptr %y, align 8
-  %z = alloca i64, align 8
-  store i64 0, ptr %z, align 8
-  %x1 = load i64, ptr %x, align 8
-  %ifcond = icmp ne i64 %x1, 0
-  br i1 %ifcond, label %then, label %else
-
-then:                                             ; preds = %entry
-  %y2 = load i64, ptr %y, align 8
-  %ifcond3 = icmp ne i64 %y2, 0
-  br i1 %ifcond3, label %then4, label %else6
-
-ifmerge:                                          ; preds = %else, %ifmerge5
-  %z7 = load i64, ptr %z, align 8
-  ret i64 %z7
-
-else:                                             ; preds = %entry
-  store i64 3, ptr %z, align 8
-  br label %ifmerge
-
-then4:                                            ; preds = %then
-  store i64 1, ptr %z, align 8
-  br label %ifmerge5
-
-ifmerge5:                                         ; preds = %else6, %then4
-  br label %ifmerge
-
-else6:                                            ; preds = %then
-  store i64 2, ptr %z, align 8
-  br label %ifmerge5
+  %1 = alloca i64, align 8
+  store i64 1, ptr %1, align 8
+  %2 = alloca i64, align 8
+  store i64 0, ptr %2, align 8
+  %3 = alloca i64, align 8
+  store i64 0, ptr %3, align 8
+  %4 = load i64, ptr %1, align 8
+  %5 = icmp ne i64 %4, 0
+  br i1 %5, label %if.then.1, label %if.else.3
+if.then.1:
+  %6 = load i64, ptr %2, align 8
+  %7 = icmp ne i64 %6, 0
+  br i1 %7, label %if.then.4, label %if.else.6
+if.then.4:
+  store i64 1, ptr %3, align 8
+  br label %if.end.5
+if.else.6:
+  store i64 2, ptr %3, align 8
+  br label %if.end.5
+if.end.5:
+  br label %if.end.2
+if.else.3:
+  store i64 3, ptr %3, align 8
+  br label %if.end.2
+if.end.2:
+  %8 = load i64, ptr %3, align 8
+  ret i64 %8
 }

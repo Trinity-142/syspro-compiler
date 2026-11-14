@@ -5,25 +5,22 @@ target triple = "x86_64-unknown-linux-gnu"
 
 define i64 @main() {
 entry:
-  %x = alloca i64, align 8
-  store i64 1, ptr %x, align 8
-  %y = alloca i64, align 8
-  store i64 0, ptr %y, align 8
-  %x1 = load i64, ptr %x, align 8
-  %cmptmp = icmp eq i64 %x1, 1
-  %zexttmp = zext i1 %cmptmp to i64
-  %ifcond = icmp ne i64 %zexttmp, 0
-  br i1 %ifcond, label %then, label %else
-
-then:                                             ; preds = %entry
-  store i64 2, ptr %y, align 8
-  br label %ifmerge
-
-ifmerge:                                          ; preds = %else, %then
-  %y2 = load i64, ptr %y, align 8
-  ret i64 %y2
-
-else:                                             ; preds = %entry
-  store i64 3, ptr %y, align 8
-  br label %ifmerge
+  %1 = alloca i64, align 8
+  store i64 1, ptr %1, align 8
+  %2 = alloca i64, align 8
+  store i64 0, ptr %2, align 8
+  %3 = load i64, ptr %1, align 8
+  %4 = icmp eq i64 %3, 1
+  %5 = zext i1 %4 to i64
+  %6 = icmp ne i64 %5, 0
+  br i1 %6, label %if.then.1, label %if.else.3
+if.then.1:
+  store i64 2, ptr %2, align 8
+  br label %if.end.2
+if.else.3:
+  store i64 3, ptr %2, align 8
+  br label %if.end.2
+if.end.2:
+  %7 = load i64, ptr %2, align 8
+  ret i64 %7
 }
