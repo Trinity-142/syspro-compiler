@@ -14,7 +14,7 @@ enum TopDecl(val startToken: Token) extends Coords {
   case ExternDecl(keyWord: Token.Extern, 
                   ident: Token.Ident, 
                   params: List[Expr.Param]) extends TopDecl(keyWord)
-  case ErrorDecl(token: Token.ErrorTok)     extends TopDecl(token)
+  case ErrorDecl(token: Token)              extends TopDecl(token)
 }
 
 enum Stmt(val startToken: Token) extends Coords {

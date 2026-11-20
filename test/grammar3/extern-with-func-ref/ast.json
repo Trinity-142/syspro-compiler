@@ -85,7 +85,7 @@
         },
         {
           "line": 9,
-          "column": 16,
+          "column": 13,
           "kind": "Call",
           "elems": [
           {
@@ -96,7 +96,7 @@
           },
           {
             "line": 9,
-            "column": 21,
+            "column": 17,
             "kind": "Call",
             "elems": [
             {

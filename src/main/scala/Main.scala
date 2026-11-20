@@ -65,7 +65,7 @@ import scala.sys.process.*
 
 
     // ------------ PARSER ------------
-    val (parsedAst, parserErrors) = parseProgram(ParserState(lexedTokens, errors = List.empty), Nil)
+    val (parsedAst, parserErrors) = parseProgram(ParserState(lexedTokens))
     if (astOut.nonEmpty) {
       val astJsonString = AstSerializer.toJson(parsedAst)
       Using(PrintWriter(File(astOut))) { writer =>
@@ -78,14 +78,8 @@ import scala.sys.process.*
       sys.exit(1)
     }
 
-    if (!parsedAst.lastOption.exists(_.isInstanceOf[Stmt.Return])) {
-      System.err.println("Semantic error: last statement must be a 'return' statement")
-      sys.exit(1)
-    }
-
     // ------------ AST ANALYZER ------------
-    val initialState = AstAnalyzer.AnalyzerState()
-    val finalAnalyzerState = parsedAst.foldLeft(initialState)((state, stmt) => AstAnalyzer.analyze(state, stmt))
+    val finalAnalyzerState = AstAnalyzer.analyzeProgram(parsedAst)
 
     if (finalAnalyzerState.errors.nonEmpty) {
       finalAnalyzerState.errors.reverse.foreach(System.err.println)
@@ -94,7 +88,11 @@ import scala.sys.process.*
 
     // ------------ IR GENERATOR & COMPILATION ------------
     if (llvmOut.nonEmpty) {
-      val instructions = IRGenerator.generate(parsedAst)
+      val stmts = parsedAst.collect {
+        case TopDecl.FuncDecl(_, _, _, body) => body.stmts
+      }.flatten
+
+      val instructions = IRGenerator.generate(stmts)
       val header =
         """|; ModuleID = 'spl'
            |source_filename = "spl"

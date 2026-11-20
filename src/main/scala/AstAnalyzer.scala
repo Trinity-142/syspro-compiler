@@ -1,11 +1,82 @@
 object AstAnalyzer {
   case class AnalyzerState(
-    symbolTable: Map[String, Boolean] = Map.empty,
-    errors: List[String] = Nil,
-    loopDepth: Int = 0) {
+                            symbolTable: Map[String, Boolean] = Map.empty,  // variable name -> mutability
+                            functions: Map[String, Int] = Map.empty,        // func name -> arity
+                            errors: List[String] = Nil,
+                            loopDepth: Int = 0
+                          ) {
     def withError(msg: String): AnalyzerState = this.copy(errors = msg :: this.errors)
   }
-  
+
+  def analyzeProgram(decls: List[TopDecl]): AnalyzerState = {
+    val stateWithFuncs = decls.foldLeft(AnalyzerState()) { (state, decl) =>
+      decl match {
+        case TopDecl.FuncDecl(_, ident, params, _) =>
+          if (state.functions.contains(ident.lexeme))
+            state.withError(s"Semantic error at ${ident.line}:${ident.column}: function '${ident.lexeme}' is already defined")
+          else
+            state.copy(functions = state.functions + (ident.lexeme -> params.length))
+
+        case TopDecl.ExternDecl(_, ident, params) =>
+          if (state.functions.contains(ident.lexeme))
+            state.withError(s"Semantic error at ${ident.line}:${ident.column}: function '${ident.lexeme}' is already defined")
+          else
+            state.copy(functions = state.functions + (ident.lexeme -> params.length))
+
+        case TopDecl.ErrorDecl(_) => state
+      }
+    }
+
+    val hasMain = decls.exists {
+      case TopDecl.FuncDecl(_, ident, _, _) => ident.lexeme == "main"
+      case _                                => false
+    }
+    val stateAfterMainCheck =
+      if (hasMain) stateWithFuncs
+      else stateWithFuncs.withError("Semantic error: 'main' function must be explicitly defined")
+
+    decls.foldLeft(stateAfterMainCheck)((state, decl) => analyzeDecl(state, decl))
+  }
+
+  def analyzeDecl(state: AnalyzerState, decl: TopDecl): AnalyzerState = decl match {
+    case TopDecl.ExternDecl(_, paramsIdent, params) =>
+      val (stateAfterParams, _) = params.foldLeft((state, Set.empty[String])) {
+        case ((accState, seen), Expr.Param(pIdent)) =>
+          if (seen.contains(pIdent.lexeme))
+            (accState.withError(s"Semantic error at ${pIdent.line}:${pIdent.column}: parameter '${pIdent.lexeme}' is already defined"), seen)
+          else
+            (accState, seen + pIdent.lexeme)
+      }
+      stateAfterParams
+
+    case TopDecl.FuncDecl(kw, ident, params, body) =>
+      val (stateWithParams, paramSymbols) = params.foldLeft((state, Map.empty[String, Boolean])) {
+        case ((accState, symAcc), Expr.Param(pIdent)) =>
+          if (symAcc.contains(pIdent.lexeme))
+            (accState.withError(s"Semantic error at ${pIdent.line}:${pIdent.column}: parameter '${pIdent.lexeme}' is already defined"), symAcc)
+          else
+            (accState, symAcc + (pIdent.lexeme -> true))
+      }
+
+      val funcInitialState = stateWithParams.copy(symbolTable = paramSymbols, loopDepth = 0)
+      val stateAfterBody = analyze(funcInitialState, body)
+
+      val stateAfterReturnCheck =
+        if (hasReturnOnAllPaths(body)) stateAfterBody
+        else stateAfterBody.withError(s"Semantic error at ${ident.line}:${ident.column}: function '${ident.lexeme}' must end with a 'return' statement on all paths")
+
+      state.copy(errors = stateAfterReturnCheck.errors)
+
+    case TopDecl.ErrorDecl(_) => state
+  }
+
+  def hasReturnOnAllPaths(stmt: Stmt): Boolean = stmt match {
+    case _: Stmt.Return                              => true
+    case Stmt.Block(_, stmts)                        => stmts.exists(hasReturnOnAllPaths)
+    case Stmt.If(_, _, thenBranch, Some(elseBranch)) => hasReturnOnAllPaths(thenBranch) && hasReturnOnAllPaths(elseBranch)
+    case _                                           => false
+  }
+
   def analyze(state: AnalyzerState, stmt: Stmt | Expr): AnalyzerState = stmt match {
 
     // ------------ STATEMENTS ------------
@@ -72,6 +143,19 @@ object AstAnalyzer {
       if (!state.symbolTable.contains(ident.lexeme)) {
         state.withError(s"Semantic error at ${ident.line}:${ident.column}: '${ident.lexeme}' not found")
       } else state
+
+    case Expr.Call(ident, args) =>
+      val stateAfterCallee = state.functions.get(ident.lexeme) match {
+        case None =>
+          state.withError(s"Semantic error at ${ident.line}:${ident.column}: function '${ident.lexeme}' not found")
+        case Some(expectedArity) if expectedArity != args.length =>
+          state.withError(s"Semantic error at ${ident.line}:${ident.column}: function '${ident.lexeme}' expects $expectedArity arguments, but ${args.length} given")
+        case Some(_) =>
+          state
+      }
+      args.foldLeft(stateAfterCallee)((acc, arg) => analyze(acc, arg))
+
+    case Expr.Param(_) => state
 
     case Expr.Binary(left, _, right) =>
       analyze(analyze(state, left), right)

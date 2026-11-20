@@ -131,7 +131,7 @@
         },
         {
           "line": 10,
-          "column": 16,
+          "column": 13,
           "kind": "Call",
           "elems": [
           {
