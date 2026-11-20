@@ -63,7 +63,7 @@ object REPL {
   }
   
   private def analyzeLine(ast: List[Stmt], analyzerState: AstAnalyzer.AnalyzerState): Either[List[String], AstAnalyzer.AnalyzerState] = {
-    val finalAnalyzerState = ast.foldLeft(analyzerState)((state, stmt) => AstAnalyzer.analyze(state, stmt))
+    val finalAnalyzerState = AstAnalyzer.analyzeStmts(ast, analyzerState)
     val errors = finalAnalyzerState.errors.reverse
     Either.cond(errors.isEmpty, finalAnalyzerState, errors)
   }
