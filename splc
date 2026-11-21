@@ -1,3 +1,2 @@
 #!/bin/bash
-cmake - S libruntime -B libruntime / build && cmake -- build libruntime / build
 scala -cp target/classes -M main -- "$@"

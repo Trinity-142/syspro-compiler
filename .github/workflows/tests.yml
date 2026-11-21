@@ -40,6 +40,9 @@ jobs:
       - name: Install test harness dependency
         run: pip install pytest
 
+      - name: Build runtime library
+        run: cmake -S libruntime -B libruntime/build && cmake --build libruntime/build
+
       - name: Build your compiler
         run: sbt compile
 
