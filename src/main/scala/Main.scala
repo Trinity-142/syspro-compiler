@@ -88,21 +88,7 @@ import scala.sys.process.*
 
     // ------------ IR GENERATOR & COMPILATION ------------
     if (llvmOut.nonEmpty) {
-      val stmts = parsedAst.collect {
-        case TopDecl.FuncDecl(_, _, _, body) => body.stmts
-      }.flatten
-
-      val instructions = IRGenerator.generate(stmts)
-      val header =
-        """|; ModuleID = 'spl'
-           |source_filename = "spl"
-           |target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
-           |target triple = "x86_64-unknown-linux-gnu"
-           |
-           |define i64 @main() {
-           |entry:""".stripMargin
-      val body = instructions.mkString("\n")
-      val llvmIR = s"$header\n$body\n}\n"
+      val llvmIR = IRGenerator.codeGenProgram(parsedAst)
 
       if (llvmOut.endsWith(".ll")) {
         Using(PrintWriter(File(llvmOut))) { writer =>
@@ -114,7 +100,11 @@ import scala.sys.process.*
         Using(PrintWriter(tmpllFile)) { writer =>
           writer.write(llvmIR)
         }
-        val compileCommand = s"clang -Wno-override-module ${tmpllFile.getAbsolutePath} -o $llvmOut"
+
+        val projectRoot = File(IRGenerator.getClass.getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getParentFile
+        val runtimeLibDir = File(projectRoot, "libruntime/build").getAbsolutePath
+
+        val compileCommand = s"clang -Wno-override-module ${tmpllFile.getAbsolutePath} -L$runtimeLibDir -lsplruntime -o $llvmOut"
         val compileExitCode = compileCommand.!
         if (compileExitCode != 0) {
           System.err.println("LLVM IR compilation error")

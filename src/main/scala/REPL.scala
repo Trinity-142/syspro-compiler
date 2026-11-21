@@ -110,7 +110,7 @@ object REPL {
   }
 
   private def runLli(stmts: List[Stmt]): Either[List[String], String] = {
-    val instructions = IRGenerator.generate(stmts)
+    val instructions = IRGenerator.codeGenStmts(stmts)
     val header =
       """|; ModuleID = 'spl'
          |source_filename = "spl"

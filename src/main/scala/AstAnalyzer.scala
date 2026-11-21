@@ -6,11 +6,14 @@ object AstAnalyzer {
     symbolTable: Map[String, Boolean] = Map.empty,  // variable name -> mutability
     functions: Map[String, Int] = Map.empty,        // func name -> arity
     errors: List[String] = Nil,
-    loopDepth: Int = 0)
+    loopDepth: Int = 0
+  )
 
-  type Analyzer[A] = State[AnalyzerState, A]
+  private type Analyzer[A] = State[AnalyzerState, A]
 
   private val noop: Analyzer[Unit] = State.pure(())
+
+  // ------------ UTILITIES ------------
 
   private def addError(msg: String): Analyzer[Unit] =
     State.modify(s => s.copy(errors = msg :: s.errors))
@@ -46,6 +49,8 @@ object AstAnalyzer {
       } yield ()
     }
 
+  // ------------ TOP-LEVEL DECLARATIONS ------------
+
   def analyzeProgram(decls: List[TopDecl]): AnalyzerState = {
     val hasMain = decls.exists {
       case TopDecl.FuncDecl(_, ident, _, _) => ident.lexeme == "main"
@@ -68,7 +73,7 @@ object AstAnalyzer {
   def analyzeStmts(stmts: List[Stmt], initialState: AnalyzerState): AnalyzerState =
     stmts.traverse_(analyze).runS(initialState).value
 
-  def analyzeDecl(decl: TopDecl): Analyzer[Unit] = decl match {
+  private def analyzeDecl(decl: TopDecl): Analyzer[Unit] = decl match {
     case TopDecl.ExternDecl(_, _, params) =>
       withScope(registerParams(params))
 
@@ -85,14 +90,14 @@ object AstAnalyzer {
     case TopDecl.ErrorDecl(_) => noop
   }
 
-  def hasReturnOnAllPaths(stmt: Stmt): Boolean = stmt match {
+  private def hasReturnOnAllPaths(stmt: Stmt): Boolean = stmt match {
     case _: Stmt.Return                              => true
     case Stmt.Block(_, stmts)                        => stmts.exists(hasReturnOnAllPaths)
     case Stmt.If(_, _, thenBranch, Some(elseBranch)) => hasReturnOnAllPaths(thenBranch) && hasReturnOnAllPaths(elseBranch)
     case _                                           => false
   }
 
-  def analyze(node: Stmt | Expr): Analyzer[Unit] = node match {
+  private def analyze(node: Stmt | Expr): Analyzer[Unit] = node match {
 
     // ------------ STATEMENTS ------------
     case Stmt.Decl(keyWord, ident, value) => for {
