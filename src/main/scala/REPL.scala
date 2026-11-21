@@ -52,12 +52,18 @@ object REPL {
   }
 
   private def parseLine(tokens: List[Token]): Either[List[String], List[Stmt]] = {
-    val (ast, errors) = parseProgram(ParserState(tokens, errors = Nil), program = Nil)
-    Either.cond(errors.isEmpty, ast, errors)
-  }
+    def loop(acc: List[Stmt] = Nil): ParseOrError[List[Stmt]] = peek.flatMap {
+      case Some(_: Token.Eof) | None => pure(acc.reverse)
+      case _ => parseStmt.flatMap(s => loop(s :: acc))
+    }
 
+    val (finalState, stmtsEither) = loop().value.run(ParserState(tokens)).value
+    val errors = finalState.errors.reverse
+    Either.cond(errors.isEmpty, stmtsEither.getOrElse(Nil), errors)
+  }
+  
   private def analyzeLine(ast: List[Stmt], analyzerState: AstAnalyzer.AnalyzerState): Either[List[String], AstAnalyzer.AnalyzerState] = {
-    val finalAnalyzerState = ast.foldLeft(analyzerState)((state, stmt) => AstAnalyzer.analyze(state, stmt))
+    val finalAnalyzerState = AstAnalyzer.analyzeStmts(ast, analyzerState)
     val errors = finalAnalyzerState.errors.reverse
     Either.cond(errors.isEmpty, finalAnalyzerState, errors)
   }
@@ -104,7 +110,7 @@ object REPL {
   }
 
   private def runLli(stmts: List[Stmt]): Either[List[String], String] = {
-    val instructions = IRGenerator.generate(stmts)
+    val instructions = IRGenerator.codeGenStmts(stmts)
     val header =
       """|; ModuleID = 'spl'
          |source_filename = "spl"

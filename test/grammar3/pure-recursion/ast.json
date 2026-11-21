@@ -89,7 +89,7 @@
           },
           {
             "line": 5,
-            "column": 20,
+            "column": 16,
             "kind": "Call",
             "elems": [
             {
@@ -150,7 +150,7 @@
         "elems": [
         {
           "line": 9,
-          "column": 16,
+          "column": 12,
           "kind": "Call",
           "elems": [
           {

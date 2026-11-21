@@ -11,7 +11,7 @@ jobs:
     strategy:
       matrix:
         # Add grammar versions you have implemented (e.g. [1, 2, 3, 4, 5])
-        grammar: [2]
+        grammar: [3]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -39,6 +39,9 @@ jobs:
 
       - name: Install test harness dependency
         run: pip install pytest
+
+      - name: Build runtime library
+        run: cmake -S libruntime -B libruntime/build && cmake --build libruntime/build
 
       - name: Build your compiler
         run: sbt compile
