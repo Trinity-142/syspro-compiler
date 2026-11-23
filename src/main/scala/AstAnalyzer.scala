@@ -2,7 +2,7 @@ import cats.data.State
 import cats.syntax.all.*
 
 object AstAnalyzer {
-  case class AnalyzerState(
+  private case class AnalyzerState(
     symbolTable: Map[String, Boolean] = Map.empty,  // variable name -> mutability
     functions: Map[String, Int] = Map.empty,        // func name -> arity
     errors: List[String] = Nil,
@@ -13,45 +13,49 @@ object AstAnalyzer {
 
   private val noop: Analyzer[Unit] = State.pure(())
 
+  private def inspect[A](f: AnalyzerState => A): Analyzer[A] = State.inspect(f)
+
+  private def modify(f: AnalyzerState => AnalyzerState): Analyzer[Unit] = State.modify(f)
+
   // ------------ UTILITIES ------------
 
   private def addError(msg: String): Analyzer[Unit] =
-    State.modify(s => s.copy(errors = msg :: s.errors))
+    modify(s => s.copy(errors = msg :: s.errors))
 
   private def withScope[A](action: Analyzer[A]): Analyzer[A] = for {
-    savedSymbols <- State.inspect[AnalyzerState, Map[String, Boolean]](_.symbolTable)
+    savedSymbols <- inspect(_.symbolTable)
     res          <- action
-    _            <- State.modify[AnalyzerState](_.copy(symbolTable = savedSymbols))
+    _            <- modify(_.copy(symbolTable = savedSymbols))
   } yield res
 
   private def withLoop[A](action: Analyzer[A]): Analyzer[A] = for {
-    _   <- State.modify[AnalyzerState](s => s.copy(loopDepth = s.loopDepth + 1))
+    _   <- modify(s => s.copy(loopDepth = s.loopDepth + 1))
     res <- action
-    _   <- State.modify[AnalyzerState](s => s.copy(loopDepth = s.loopDepth - 1))
+    _   <- modify(s => s.copy(loopDepth = s.loopDepth - 1))
   } yield res
 
   private def registerFunc(ident: Token.Ident, arity: Int): Analyzer[Unit] = for {
-    exists <- State.inspect[AnalyzerState, Boolean](_.functions.contains(ident.lexeme))
+    exists <- inspect(_.functions.contains(ident.lexeme))
     _ <- if (exists)
       addError(s"Semantic error at ${ident.line}:${ident.column}: function '${ident.lexeme}' is already defined")
     else
-      State.modify[AnalyzerState](s => s.copy(functions = s.functions + (ident.lexeme -> arity)))
+      modify(s => s.copy(functions = s.functions + (ident.lexeme -> arity)))
   } yield ()
 
   private def registerParams(params: List[Expr.Param]): Analyzer[Unit] =
     params.traverse_ { case Expr.Param(pIdent) =>
       for {
-        exists <- State.inspect[AnalyzerState, Boolean](_.symbolTable.contains(pIdent.lexeme))
+        exists <- inspect(_.symbolTable.contains(pIdent.lexeme))
         _ <- if (exists)
           addError(s"Semantic error at ${pIdent.line}:${pIdent.column}: parameter '${pIdent.lexeme}' is already defined")
         else
-          State.modify[AnalyzerState](s => s.copy(symbolTable = s.symbolTable + (pIdent.lexeme -> true)))
+          modify(s => s.copy(symbolTable = s.symbolTable + (pIdent.lexeme -> true)))
       } yield ()
     }
 
-  // ------------ TOP-LEVEL DECLARATIONS ------------
-
-  def analyzeProgram(decls: List[TopDecl]): AnalyzerState = {
+  // ------------ ENTRY POINTS ------------
+  
+  def analyzeProgram(decls: List[TopDecl]): List[String] = {
     val hasMain = decls.exists {
       case TopDecl.FuncDecl(_, ident, _, _) => ident.lexeme == "main"
       case _                                => false
@@ -67,12 +71,14 @@ object AstAnalyzer {
       _ <- decls.traverse_(analyzeDecl)
     } yield ()
 
-    programAnalysis.runS(AnalyzerState()).value
+    programAnalysis.runS(AnalyzerState()).value.errors.reverse
   }
 
-  def analyzeStmts(stmts: List[Stmt], initialState: AnalyzerState): AnalyzerState =
-    stmts.traverse_(analyze).runS(initialState).value
+  def analyzeStmts(stmts: List[Stmt]): List[String] =
+    stmts.traverse_(analyze).runS(AnalyzerState()).value.errors.reverse
 
+  // ------------ TOP-LEVEL DECLARATIONS ------------
+  
   private def analyzeDecl(decl: TopDecl): Analyzer[Unit] = decl match {
     case TopDecl.ExternDecl(_, _, params) =>
       withScope(registerParams(params))
@@ -100,19 +106,20 @@ object AstAnalyzer {
   private def analyze(node: Stmt | Expr): Analyzer[Unit] = node match {
 
     // ------------ STATEMENTS ------------
+    
     case Stmt.Decl(keyWord, ident, value) => for {
       _      <- analyze(value)
-      exists <- State.inspect[AnalyzerState, Boolean](_.symbolTable.contains(ident.lexeme))
+      exists <- inspect(_.symbolTable.contains(ident.lexeme))
       _ <- if (!exists) {
         val isMutable = keyWord.isInstanceOf[Token.Var]
-        State.modify[AnalyzerState](s => s.copy(symbolTable = s.symbolTable + (ident.lexeme -> isMutable)))
+        modify(s => s.copy(symbolTable = s.symbolTable + (ident.lexeme -> isMutable)))
       } else {
         addError(s"Semantic error at ${ident.line}:${ident.column}: '${ident.lexeme}' is already defined")
       }
     } yield ()
 
     case Stmt.Assign(ident, _, value) => for {
-      mutability <- State.inspect[AnalyzerState, Option[Boolean]](_.symbolTable.get(ident.lexeme))
+      mutability <- inspect(_.symbolTable.get(ident.lexeme))
       _ <- mutability match {
         case None =>
           addError(s"Semantic error at ${ident.line}:${ident.column}: '${ident.lexeme}' not found")
@@ -136,13 +143,13 @@ object AstAnalyzer {
     } yield ()
 
     case Stmt.Break(kw) =>
-      State.inspect[AnalyzerState, Int](_.loopDepth).flatMap { depth =>
+      inspect(_.loopDepth).flatMap { depth =>
         if (depth == 0) addError(s"Semantic error at ${kw.line}:${kw.column}: 'break' outside of loop")
         else noop
       }
 
     case Stmt.Continue(kw) =>
-      State.inspect[AnalyzerState, Int](_.loopDepth).flatMap { depth =>
+      inspect(_.loopDepth).flatMap { depth =>
         if (depth == 0) addError(s"Semantic error at ${kw.line}:${kw.column}: 'continue' outside of loop")
         else noop
       }
@@ -155,8 +162,9 @@ object AstAnalyzer {
     case Stmt.ErrorStmt(_)    => noop
 
     // ------------ EXPRESSIONS ------------
+    
     case Expr.Ident(ident) => for {
-      mutability <- State.inspect[AnalyzerState, Option[Boolean]](_.symbolTable.get(ident.lexeme))
+      mutability <- inspect(_.symbolTable.get(ident.lexeme))
       _ <- mutability match {
         case None =>
           addError(s"Semantic error at ${ident.line}:${ident.column}: '${ident.lexeme}' not found")
@@ -165,7 +173,7 @@ object AstAnalyzer {
     } yield ()
 
     case Expr.Call(ident, args) => for {
-      arityOp <- State.inspect[AnalyzerState, Option[Int]](_.functions.get(ident.lexeme))
+      arityOp <- inspect(_.functions.get(ident.lexeme))
       _ <- arityOp match {
         case None =>
           addError(s"Semantic error at ${ident.line}:${ident.column}: function '${ident.lexeme}' not found")

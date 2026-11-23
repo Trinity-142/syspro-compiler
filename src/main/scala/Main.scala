@@ -51,6 +51,7 @@ import scala.sys.process.*
     val chars = source.to(LazyList)
 
     // ------------ LEXER ------------
+    
     val lexedTokens = Lexer.lexing(chars, 1, 1, Nil)
     if (tokensOut.nonEmpty) {
       Using(PrintWriter(File(tokensOut))) { writer =>
@@ -63,9 +64,9 @@ import scala.sys.process.*
       sys.exit(0)
     }
 
-
     // ------------ PARSER ------------
-    val (parsedAst, parserErrors) = parseProgram(ParserState(lexedTokens))
+    
+    val (parsedAst, parserErrors) = Parser.parseProgram(lexedTokens)
     if (astOut.nonEmpty) {
       val astJsonString = AstSerializer.toJson(parsedAst)
       Using(PrintWriter(File(astOut))) { writer =>
@@ -79,14 +80,16 @@ import scala.sys.process.*
     }
 
     // ------------ AST ANALYZER ------------
-    val finalAnalyzerState = AstAnalyzer.analyzeProgram(parsedAst)
+    
+    val analyzerErrors = AstAnalyzer.analyzeProgram(parsedAst)
 
-    if (finalAnalyzerState.errors.nonEmpty) {
-      finalAnalyzerState.errors.reverse.foreach(System.err.println)
+    if (analyzerErrors.nonEmpty) {
+      analyzerErrors.foreach(System.err.println)
       sys.exit(1)
     }
 
     // ------------ IR GENERATOR & COMPILATION ------------
+    
     if (llvmOut.nonEmpty) {
       val llvmIR = IRGenerator.codeGenProgram(parsedAst)
 

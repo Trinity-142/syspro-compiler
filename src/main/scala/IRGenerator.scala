@@ -3,7 +3,7 @@ import cats.syntax.all.*
 import scala.util.Try
 
 object IRGenerator {
-  case class CodegenState(
+  private case class CodegenState(
     nextRegId: Int = 1,
     nextLabelId: Int = 1,
     currentLabel: String = "entry",
@@ -19,14 +19,16 @@ object IRGenerator {
   private def pure[A](value: A): Codegen[A] = State.pure(value)
 
   private def inspect[A](f: CodegenState => A): Codegen[A] = State.inspect(f)
+  
+  private def modify(f: CodegenState => CodegenState): Codegen[Unit] = State.modify(f)
 
   // ------------ UTILITIES ------------
 
   private def emitInstr(instr: String): Codegen[Unit] =
-    State.modify(s => s.copy(instructions = s.instructions.append(instr)))
+    modify(s => s.copy(instructions = s.instructions.append(instr)))
 
   private def emitLabel(label: String): Codegen[Unit] =
-    State.modify(s => s.copy(
+    modify(s => s.copy(
       instructions = s.instructions.append(s"$label:"),
       currentLabel = label
     ))
@@ -45,13 +47,13 @@ object IRGenerator {
   private def withScope[A](action: Codegen[A]): Codegen[A] = for {
     saved <- inspect(_.identToMem)
     res   <- action
-    _     <- State.modify[CodegenState](_.copy(identToMem = saved))
+    _     <- modify(_.copy(identToMem = saved))
   } yield res
 
   private def withLoop[A](condLabel: String, endLabel: String)(action: Codegen[A]): Codegen[A] = for {
-    _   <- State.modify[CodegenState](s => s.copy(loopStack = (condLabel, endLabel) :: s.loopStack))
+    _   <- modify(s => s.copy(loopStack = (condLabel, endLabel) :: s.loopStack))
     res <- action
-    _   <- State.modify[CodegenState](s => s.copy(loopStack = s.loopStack.tail))
+    _   <- modify(s => s.copy(loopStack = s.loopStack.tail))
   } yield res
 
   private def emitBrAndLabel(targetLabel: String, nextLabel: String): Codegen[Unit] = for {
@@ -67,7 +69,7 @@ object IRGenerator {
     inspect(_.identToMem(name))
 
   private def addIdentPtr(name: String, ptrReg: String): Codegen[Unit] =
-    State.modify(s => s.copy(identToMem = s.identToMem + (name -> ptrReg)))
+    modify(s => s.copy(identToMem = s.identToMem + (name -> ptrReg)))
 
   private def genCond(expr: Expr): Codegen[String] = for {
     value   <- genExpr(expr)
@@ -93,6 +95,8 @@ object IRGenerator {
     s"$header\n\n$declsIR\n"
   }
 
+  // ------------ TOP-LEVEL DECLARATIONS ------------
+  
   private def codeGenDecl(decl: TopDecl): List[String] = decl match {
     case TopDecl.ExternDecl(_, ident, params) =>
       val paramTypes = params.map(_ => "i64").mkString(", ")
@@ -123,10 +127,6 @@ object IRGenerator {
 
     case TopDecl.ErrorDecl(_) => Nil
   }
-
-  // for REPL
-  def codeGenStmts(stmts: List[Stmt]): List[String] =
-    stmts.traverse_(genStmt).runS(CodegenState()).value.instructions.toList
 
   // ------------ EXPRESSIONS ------------
 
