@@ -51,6 +51,7 @@ import scala.sys.process.*
     val chars = source.to(LazyList)
 
     // ------------ LEXER ------------
+    
     val lexedTokens = Lexer.lexing(chars, 1, 1, Nil)
     if (tokensOut.nonEmpty) {
       Using(PrintWriter(File(tokensOut))) { writer =>
@@ -63,9 +64,9 @@ import scala.sys.process.*
       sys.exit(0)
     }
 
-
     // ------------ PARSER ------------
-    val (parsedAst, parserErrors) = parseProgram(ParserState(lexedTokens, errors = List.empty), Nil)
+    
+    val (parsedAst, parserErrors) = Parser.parseProgram(lexedTokens)
     if (astOut.nonEmpty) {
       val astJsonString = AstSerializer.toJson(parsedAst)
       Using(PrintWriter(File(astOut))) { writer =>
@@ -78,33 +79,19 @@ import scala.sys.process.*
       sys.exit(1)
     }
 
-    if (!parsedAst.lastOption.exists(_.isInstanceOf[Stmt.Return])) {
-      System.err.println("Semantic error: last statement must be a 'return' statement")
-      sys.exit(1)
-    }
-
     // ------------ AST ANALYZER ------------
-    val initialState = AstAnalyzer.AnalyzerState()
-    val finalAnalyzerState = parsedAst.foldLeft(initialState)((state, stmt) => AstAnalyzer.analyze(state, stmt))
+    
+    val analyzerErrors = AstAnalyzer.analyzeProgram(parsedAst)
 
-    if (finalAnalyzerState.errors.nonEmpty) {
-      finalAnalyzerState.errors.reverse.foreach(System.err.println)
+    if (analyzerErrors.nonEmpty) {
+      analyzerErrors.foreach(System.err.println)
       sys.exit(1)
     }
 
     // ------------ IR GENERATOR & COMPILATION ------------
+    
     if (llvmOut.nonEmpty) {
-      val instructions = IRGenerator.generate(parsedAst)
-      val header =
-        """|; ModuleID = 'spl'
-           |source_filename = "spl"
-           |target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
-           |target triple = "x86_64-unknown-linux-gnu"
-           |
-           |define i64 @main() {
-           |entry:""".stripMargin
-      val body = instructions.mkString("\n")
-      val llvmIR = s"$header\n$body\n}\n"
+      val llvmIR = IRGenerator.codeGenProgram(parsedAst)
 
       if (llvmOut.endsWith(".ll")) {
         Using(PrintWriter(File(llvmOut))) { writer =>
@@ -116,7 +103,11 @@ import scala.sys.process.*
         Using(PrintWriter(tmpllFile)) { writer =>
           writer.write(llvmIR)
         }
-        val compileCommand = s"clang -Wno-override-module ${tmpllFile.getAbsolutePath} -o $llvmOut"
+
+        val projectRoot = File(IRGenerator.getClass.getProtectionDomain.getCodeSource.getLocation.toURI).getParentFile.getParentFile
+        val runtimeLibDir = File(projectRoot, "libruntime/build").getAbsolutePath
+
+        val compileCommand = s"clang -Wno-override-module ${tmpllFile.getAbsolutePath} -L$runtimeLibDir -lsplruntime -o $llvmOut"
         val compileExitCode = compileCommand.!
         if (compileExitCode != 0) {
           System.err.println("LLVM IR compilation error")

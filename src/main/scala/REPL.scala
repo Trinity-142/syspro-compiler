@@ -10,13 +10,11 @@ import scala.sys.process._
 object REPL {
   private case class ReplState(
     historyStmts: List[Stmt] = Nil,
-    analyzerState: AstAnalyzer.AnalyzerState = AstAnalyzer.AnalyzerState(),
     lineNumber: Int = 1
   )
 
-  def start(): Unit = {
+  def start(): Unit =
     loop(ReplState())
-  }
 
   @tailrec
   private def loop(state: ReplState): Unit = {
@@ -38,8 +36,8 @@ object REPL {
       tokens            <- lexLine(str, state.lineNumber)
       ast               <- parseLine(tokens)
       reachableAst       = fromASTheadToReturn(ast)
-      nextAnalyzerState <- analyzeLine(reachableAst, state.analyzerState)
-      result            <- execute(reachableAst, state.copy(analyzerState = nextAnalyzerState))
+      _                 <- analyzeLine(state.historyStmts, reachableAst)
+      result            <- execute(reachableAst, state)
     } yield result
   }
 
@@ -52,14 +50,13 @@ object REPL {
   }
 
   private def parseLine(tokens: List[Token]): Either[List[String], List[Stmt]] = {
-    val (ast, errors) = parseProgram(ParserState(tokens, errors = Nil), program = Nil)
-    Either.cond(errors.isEmpty, ast, errors)
+    val (stmts, errors) = Parser.parseStmts(tokens)
+    Either.cond(errors.isEmpty, stmts, errors)
   }
-
-  private def analyzeLine(ast: List[Stmt], analyzerState: AstAnalyzer.AnalyzerState): Either[List[String], AstAnalyzer.AnalyzerState] = {
-    val finalAnalyzerState = ast.foldLeft(analyzerState)((state, stmt) => AstAnalyzer.analyze(state, stmt))
-    val errors = finalAnalyzerState.errors.reverse
-    Either.cond(errors.isEmpty, finalAnalyzerState, errors)
+  
+  private def analyzeLine(history: List[Stmt], newStmts: List[Stmt]): Either[List[String], Unit] = {
+    val errors = AstAnalyzer.analyzeStmts(history ++ newStmts)
+    Either.cond(errors.isEmpty, (), errors)
   }
 
   private def fromASTheadToReturn(ast: List[Stmt]): List[Stmt] = {
@@ -104,17 +101,13 @@ object REPL {
   }
 
   private def runLli(stmts: List[Stmt]): Either[List[String], String] = {
-    val instructions = IRGenerator.generate(stmts)
-    val header =
-      """|; ModuleID = 'spl'
-         |source_filename = "spl"
-         |target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128"
-         |target triple = "x86_64-unknown-linux-gnu"
-         |
-         |define i64 @main() {
-         |entry:""".stripMargin
-    val body = instructions.mkString("\n")
-    val llvmIR = s"$header\n$body\n}\n"
+    val main = TopDecl.FuncDecl(
+      Token.Def(1, 1),
+      Token.Ident("main", 1, 1),
+      Nil,
+      Stmt.Block(Token.Lbrace(1, 1), stmts)
+    )
+    val llvmIR = IRGenerator.codeGenProgram(List(main))
 
     val input = new ByteArrayInputStream(llvmIR.getBytes(StandardCharsets.UTF_8))
     val lliExitCode = ("lli" #< input).!

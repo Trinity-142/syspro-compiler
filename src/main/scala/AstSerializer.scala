@@ -1,4 +1,7 @@
 object AstSerializer {
+  private def identToJson(ident: Token): String =
+    s"""{"line": ${ident.line}, "column": ${ident.column}, "kind": "Ident", "elems": []}"""
+
   private def exprToJson(expr: Expr): String = expr match {
     case Expr.Binary(left, op, right) =>
       s"""{"line": ${op.line}, "column": ${op.column}, "kind": "BinOp", "elems": [${exprToJson(left)},${exprToJson(right)}]}"""
@@ -13,7 +16,14 @@ object AstSerializer {
       s"""{"line": ${token.line}, "column": ${token.column}, "kind": "BoolLiteral", "elems": []}"""
 
     case Expr.Ident(token) =>
-      s"""{"line": ${token.line}, "column": ${token.column}, "kind": "Ident", "elems": []}"""
+      identToJson(token)
+
+    case Expr.Param(ident) =>
+      identToJson(ident)
+
+    case Expr.Call(ident, args) =>
+      val elems = (identToJson(ident) :: args.map(exprToJson)).mkString(",")
+      s"""{"line": ${ident.line}, "column": ${ident.column}, "kind": "Call", "elems": [$elems]}"""
 
     case Expr.ErrorExpr(token) =>
       s"""{"line": ${token.line}, "column": ${token.column}, "kind": "Error", "elems": []}"""
@@ -21,15 +31,13 @@ object AstSerializer {
 
   private def stmtToJson(stmt: Stmt): String = stmt match {
     case Stmt.Decl(kw, ident, value) =>
-      val identJson = s"""{"line": ${ident.line}, "column": ${ident.column}, "kind": "Ident", "elems": []}"""
-      s"""{"line": ${kw.line}, "column": ${kw.column}, "kind": "Declare", "elems": [$identJson,${exprToJson(value)}]}"""
+      s"""{"line": ${kw.line}, "column": ${kw.column}, "kind": "Declare", "elems": [${identToJson(ident)},${exprToJson(value)}]}"""
 
     case Stmt.Return(kw, value) =>
       s"""{"line": ${kw.line}, "column": ${kw.column}, "kind": "Return", "elems": [${exprToJson(value)}]}"""
 
     case Stmt.Assign(ident, assign, value) =>
-      val identJson = s"""{"line": ${ident.line}, "column": ${ident.column}, "kind": "Ident", "elems": []}"""
-      s"""{"line": ${assign.line}, "column": ${assign.column}, "kind": "Assign", "elems": [$identJson,${exprToJson(value)}]}"""
+      s"""{"line": ${assign.line}, "column": ${assign.column}, "kind": "Assign", "elems": [${identToJson(ident)},${exprToJson(value)}]}"""
 
     case Stmt.If(kw, cond, thenBranch, elseBranch) =>
       val elems = elseBranch match {
@@ -58,9 +66,22 @@ object AstSerializer {
       s"""{"line": ${token.line}, "column": ${token.column}, "kind": "Error", "elems": []}"""
   }
 
-  def toJson(stmts: List[Stmt]): String = {
-    val (line, col) = ((stmt: Stmt) => (stmt.line, stmt.column))(stmts.head)
-    val elemsJson = stmts.map(stmtToJson).mkString(",\n")
+  private def topDeclToJson(decl: TopDecl): String = decl match {
+    case TopDecl.FuncDecl(kw, ident, params, body) =>
+      val elems = (identToJson(ident) :: params.map(exprToJson) ::: List(stmtToJson(body))).mkString(",")
+      s"""{"line": ${kw.line}, "column": ${kw.column}, "kind": "FuncDecl", "elems": [$elems]}"""
+
+    case TopDecl.ExternDecl(kw, ident, params) =>
+      val elems = (identToJson(ident) :: params.map(exprToJson)).mkString(",")
+      s"""{"line": ${kw.line}, "column": ${kw.column}, "kind": "ExternDecl", "elems": [$elems]}"""
+
+    case TopDecl.ErrorDecl(token) =>
+      s"""{"line": ${token.line}, "column": ${token.column}, "kind": "Error", "elems": []}"""
+  }
+
+  def toJson(decls: List[TopDecl]): String = {
+    val (line, col) = decls.headOption.map(d => (d.line, d.column)).getOrElse((1, 1))
+    val elemsJson = decls.map(topDeclToJson).mkString(",\n")
 
     s"""{
         "line": $line,

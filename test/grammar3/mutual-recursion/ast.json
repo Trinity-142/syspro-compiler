@@ -78,7 +78,7 @@
         "elems": [
         {
           "line": 5,
-          "column": 16,
+          "column": 10,
           "kind": "Call",
           "elems": [
           {
@@ -189,7 +189,7 @@
         "elems": [
         {
           "line": 12,
-          "column": 17,
+          "column": 10,
           "kind": "Call",
           "elems": [
           {
@@ -248,7 +248,7 @@
         "elems": [
         {
           "line": 16,
-          "column": 17,
+          "column": 10,
           "kind": "Call",
           "elems": [
           {
